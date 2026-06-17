@@ -15,7 +15,7 @@ Arguments:
   --model_dir   Required. Path to the Hugging Face model directory.
   --out         Optional. Output file path. Defaults to ./model.bin
   --quant       Optional. Quantization mode. Defaults to int8. Accepts f32 or int8.
-                int8 quantizes MLP projections only; attention stays f32.
+                int8 quantizes MLP gate/up projections only; down_proj and attention stay f32.
   
 
 python export_mistral.py --model_dir ../Mistral-7B-v0.1 --out ../mistral.bin
@@ -106,9 +106,11 @@ def pad_to_64(offset):
     return 64 - r
 
 def should_quantize(tensor_name):
-    # MLP projections quantize well; attention int8 error is too large for coherent generation.
+    # Quantize MLP up/gate only. down_proj feeds the residual directly and int8
+    # error there causes bad logits and greedy collapse (e.g. repeating "0").
+    # Attention stays f32 for the same reason.
     return args.quant != "f32" and any(
-        key in tensor_name for key in ("mlp.gate_proj", "mlp.up_proj", "mlp.down_proj")
+        key in tensor_name for key in ("mlp.gate_proj", "mlp.up_proj")
     )
 
 def load_tensor_map(header):

@@ -75,11 +75,10 @@ RegisterTest attention_reg("test attention", "f32", &test_attention<float>);
 template <typename T>
 int test_mlp(){
     std::shared_ptr<Parameters> params = get_params();
-    auto w = params->layer_weights[0];
 
-    MLP mlp(params->get_tensor<T>(0, "mlp.down_proj.weight"),
-            params->get_tensor<T>(0, "mlp.gate_proj.weight"),
-            params->get_tensor<T>(0, "mlp.up_proj.weight"));
+    MLP<T> mlp(params->get_tensor<float>(0, "mlp.down_proj.weight"),
+               params->get_tensor<T>(0, "mlp.gate_proj.weight"),
+               params->get_tensor<T>(0, "mlp.up_proj.weight"));
 
     infer.hidden_state.copy_from(expected.at("mlp_h"));
 

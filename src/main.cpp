@@ -5,14 +5,32 @@
 #include <chrono>
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 std::random_device rd;
 std::mt19937 gen(rd());
 std::uniform_real_distribution<double> distr(0.0, 1.0);
 
+static constexpr float REPETITION_PENALTY = 1.15f;
+
 uint64_t get_timestamp_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
+void apply_repetition_penalty(InferenceState& infer, const std::vector<uint32_t>& history) {
+    std::unordered_set<uint32_t> seen;
+    for (uint32_t token_id : history) {
+        if (!seen.insert(token_id).second) {
+            continue;
+        }
+        float& logit = infer.logits.data[token_id];
+        if (logit > 0.0f) {
+            logit /= REPETITION_PENALTY;
+        } else {
+            logit *= REPETITION_PENALTY;
+        }
+    }
 }
 
 uint32_t sample_max(InferenceState& infer){
@@ -51,8 +69,19 @@ uint32_t sample_multinomial(InferenceState& infer, float temp){
 }
 
 template <typename T>
-uint32_t generate(Model<T>& model, InferenceState& infer, size_t token, float temp){
+uint32_t generate(
+    Model<T>& model,
+    InferenceState& infer,
+    size_t token,
+    float temp,
+    std::vector<uint32_t>& history
+){
     model.forward(infer, token);
+    apply_repetition_penalty(infer, history);
+
+    if (temp <= 0) {
+        return sample_max(infer);
+    }
     return sample_multinomial(infer, temp);
 }
 
@@ -60,7 +89,7 @@ template <typename T>
 void run_inference(std::shared_ptr<Parameters> params, InferenceState& infer, const std::vector<uint32_t>& got, float temp) {
     Model<T> model(params);
 
-    for (int i=0; i<got.size()-1; i++){
+    for (int i=0; i<(int)got.size()-1; i++){
         model.forward(infer, got[i]);
     }
 
@@ -68,6 +97,8 @@ void run_inference(std::shared_ptr<Parameters> params, InferenceState& infer, co
 
     uint32_t t = got[got.size()-1];
     int i = 0;
+
+    std::vector<uint32_t> history = got;
     
     // Get EOS token ID (</s> for Mistral), fallback to 2 if not found
     uint32_t eos_token_id = 2;  // Default fallback
@@ -77,7 +108,8 @@ void run_inference(std::shared_ptr<Parameters> params, InferenceState& infer, co
     }
     
     for (;i<50;i++){
-        t = generate(model, infer, t, temp);
+        t = generate(model, infer, t, temp, history);
+        history.push_back(t);
 
         if (t == eos_token_id){
             break;

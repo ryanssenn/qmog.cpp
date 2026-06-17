@@ -96,8 +96,8 @@ void Attention::forward(InferenceState &infer) {
 // It runs the input through two linear projections.
 // The first gives the main signal, the second goes through a silu activation
 // Then multiplies these two paths together and apply the final projection
-template <typename T>
-void MLP<T>::forward(InferenceState &infer) {
+template <typename TGateUp>
+void MLP<TGateUp>::forward(InferenceState &infer) {
     // gate_proj [14336, 4096] @ hidden_state [4096]
     matmul(infer.mlp_gate, gate_proj, infer.hidden_state);
 

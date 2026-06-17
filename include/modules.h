@@ -52,13 +52,14 @@ struct Attention {
 
 
 // https://github.com/huggingface/transformers/blob/main/src/transformers/models/mistral/modeling_mistral.py#L35
-template <typename T>
+template <typename TGateUp>
 struct MLP {
-    Tensor<T> down_proj;
-    Tensor<T> gate_proj;
-    Tensor<T> up_proj;
+    Tensor<float> down_proj;
+    Tensor<TGateUp> gate_proj;
+    Tensor<TGateUp> up_proj;
 
-    MLP(const Tensor<T>& down_proj, const Tensor<T>& gate_proj, const Tensor<T>& up_proj) : down_proj(down_proj), gate_proj(gate_proj), up_proj(up_proj){}
+    MLP(const Tensor<float>& down_proj, const Tensor<TGateUp>& gate_proj, const Tensor<TGateUp>& up_proj)
+        : down_proj(down_proj), gate_proj(gate_proj), up_proj(up_proj) {}
 
     void forward(InferenceState& infer);
 };
@@ -84,7 +85,7 @@ struct Layer {
                                      p->get_tensor<float>(i, "self_attn.v_proj.weight"),
                                      p->get_tensor<float>(i, "self_attn.o_proj.weight"), i),
 
-                                mlp(p->get_tensor<TMlp>(i, "mlp.down_proj.weight"),
+                                mlp(p->get_tensor<float>(i, "mlp.down_proj.weight"),
                                     p->get_tensor<TMlp>(i, "mlp.gate_proj.weight"),
                                     p->get_tensor<TMlp>(i, "mlp.up_proj.weight"))
                                 {}
