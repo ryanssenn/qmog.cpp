@@ -3,6 +3,7 @@
 #include "../include/modules.h"
 #include <random>
 #include <chrono>
+#include <cmath>
 #include <string>
 #include <vector>
 #include <unordered_set>
@@ -125,14 +126,59 @@ void run_inference(std::shared_ptr<Parameters> params, InferenceState& infer, co
     std::cout << "throughput: " << (i+1) / ((end_time - start_time) / 1000.0) << " tok/s" << std::endl;
 }
 
+// Teacher-forced perplexity over the prompt tokens using the actual engine.
+// PPL = exp( mean_i -log softmax(logits_i)[token_{i+1}] ).
+template <typename T>
+void run_perplexity(std::shared_ptr<Parameters> params, InferenceState& infer, const std::vector<uint32_t>& tokens) {
+    Model<T> model(params);
+    infer.pos = 0;
+
+    size_t vocab = params->config.vocab_size;
+    double nll = 0.0;
+    size_t count = 0;
+    std::vector<double> per_token_nll;
+
+    for (size_t i = 0; i + 1 < tokens.size(); i++) {
+        model.forward(infer, tokens[i]);
+
+        // Numerically stable log-softmax over the vocab.
+        float maxv = infer.logits.data[0];
+        for (size_t j = 1; j < vocab; j++) {
+            maxv = std::max(maxv, infer.logits.data[j]);
+        }
+        double sumexp = 0.0;
+        for (size_t j = 0; j < vocab; j++) {
+            sumexp += std::exp((double)infer.logits.data[j] - maxv);
+        }
+        double log_z = (double)maxv + std::log(sumexp);
+        double logp = (double)infer.logits.data[tokens[i + 1]] - log_z;
+
+        nll += -logp;
+        per_token_nll.push_back(-logp);
+        count++;
+    }
+
+    std::cout << "token_ids:";
+    for (uint32_t id : tokens) std::cout << " " << id;
+    std::cout << std::endl;
+    std::cout << "per_token_nll:";
+    for (double v : per_token_nll) std::cout << " " << v;
+    std::cout << std::endl;
+    std::cout << "tokens: " << tokens.size() << std::endl;
+    std::cout << "perplexity: " << std::exp(nll / count) << std::endl;
+}
+
 int main(int argc, char** argv) {
     float temp = 0.0f;
+    bool ppl = false;
     std::vector<std::string> positional;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
         if (arg == "--temp" && i + 1 < argc) {
             temp = std::stof(argv[++i]);
+        } else if (arg == "--ppl") {
+            ppl = true;
         } else {
             positional.push_back(arg);
         }
@@ -152,6 +198,16 @@ int main(int argc, char** argv) {
 
     InferenceState infer(params->config);
     std::vector<uint32_t> got = params->tokenizer.encode(text);
+
+    if (ppl) {
+        if (params->config.quant == "int8") {
+            run_perplexity<int8_t>(params, infer, got);
+        } else if (params->config.quant == "f32") {
+            run_perplexity<float>(params, infer, got);
+        }
+        return 0;
+    }
+
     if (params->config.quant == "int8") {
         run_inference<int8_t>(params, infer, got, temp);
     } else if (params->config.quant == "f32") {

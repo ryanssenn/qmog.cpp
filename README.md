@@ -6,7 +6,7 @@ The project was built by hand up to the first usable int8 generation path: model
 
 Educational project for understanding LLM inference, not a production engine.
 
-Current status: int8 runs at ~4.9 tok/s on Apple M4; quality is still WIP due to numerical drift.
+Current status: int8 runs at ~4.9 tok/s on Apple M4; quality is still WIP due to numerical drift (int8 engine perplexity ~90 vs ~3.7 for f32, see [Numerical drift](#numerical-drift-int8)).
 
 Independent project, not affiliated with Mistral AI.
 
@@ -209,6 +209,22 @@ Model binary open failed
 ```
 
 then `./mistral.bin` does not exist at the repo root. Run the export command in step 3, or copy the exported model binary to `./mistral.bin`.
+
+# Numerical drift (int8)
+
+The int8 path loses accuracy, but **not** because of the quantization itself. Swapping the dequantized int8 gate/up weights back into the reference Hugging Face model changes perplexity by only **+0.08%** (3.726 → 3.729 on a 193-token passage), so per-group symmetric int8 is essentially lossless as a weight format.
+
+The loss comes from the **int8 inference engine**, and it **compounds with sequence length**: each token's small error feeds the KV cache and accumulates. Early tokens stay close to the f32 reference, then perplexity climbs steeply. Measured on the same passage (f32 reference perplexity ≈ 3.7 throughout):
+
+| Context length | int8 engine perplexity |
+| -------------- | ---------------------- |
+| first 16 tokens  | ~32  |
+| first 32 tokens  | ~27  |
+| first 64 tokens  | ~54  |
+| first 128 tokens | ~87  |
+| first 192 tokens | ~90  |
+
+So the engine is roughly **24× worse** than f32 at next-token prediction over a full passage (~90 vs ~3.7), driven almost entirely by drift accumulation in the int8 matmul path rather than the quantized weights. Reducing this drift is the main open work item for the quantized path.
 
 # Roadmap
 
