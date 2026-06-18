@@ -52,6 +52,20 @@ def topk(logits):
 
 
 @torch.inference_mode()
+def dump_prompt_ppl(f, model, input_ids, prefix):
+    attention_mask = torch.ones_like(input_ids)
+    out = model(input_ids, attention_mask=attention_mask, use_cache=False)
+    logits = out.logits[0, :-1].float()
+    targets = input_ids[0, 1:]
+    log_probs = torch.log_softmax(logits, dim=-1)
+    nll = -log_probs[torch.arange(targets.numel(), device=targets.device), targets]
+
+    dump_vector(f, f"ppl_{prefix}_token_nll", nll.cpu())
+    dump_vector(f, f"ppl_{prefix}_mean_nll", nll.mean().cpu().reshape(1))
+    dump_vector(f, f"ppl_{prefix}_ppl", torch.exp(nll.mean()).cpu().reshape(1))
+
+
+@torch.inference_mode()
 def dump_logits_trace(f, model, input_ids, prefix):
     # Explicit greedy loop with plain forward calls. We avoid model.generate()
     # (it can hang on MPS) and KV cache; recomputing the short sequence each step
@@ -114,6 +128,7 @@ def main():
             ids = tokenizer.encode(prompt, add_special_tokens=True)
             input_ids = torch.tensor([ids], dtype=torch.long, device=device)
 
+            dump_prompt_ppl(f, model, input_ids, prefix)
             dump_logits_trace(f, model, input_ids, prefix)
             f.flush()
 

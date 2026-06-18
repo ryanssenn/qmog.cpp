@@ -100,10 +100,12 @@ void matmul(Tensor<float>& xout, Tensor<int8_t>& w, Tensor<float>& x){
 
     assert(x.numel == d && xout.numel >= n && "matmul shape mismatch");
 
-    constexpr size_t GROUP_SIZE = 64;
-    const size_t num_groups = d / GROUP_SIZE;
     const size_t nscales = w.scales.size();
     const size_t numel = w.numel;
+    assert(nscales > 0 && numel % nscales == 0 && "invalid int8 scale metadata");
+    const size_t group_size = numel / nscales;
+    assert(d % group_size == 0 && "int8 group size must align with matmul rows");
+    const size_t num_groups = d / group_size;
 
     #pragma omp parallel for
     for (int i=0; i<(int)n; i++){
@@ -111,17 +113,17 @@ void matmul(Tensor<float>& xout, Tensor<int8_t>& w, Tensor<float>& x){
         size_t w_offset = i * d;
 
         for (size_t g=0; g<num_groups; g++){
-            size_t group_start = g * GROUP_SIZE;
-            size_t scale_idx = (nscales * (w_offset + group_start)) / numel;
+            size_t group_start = g * group_size;
+            size_t scale_idx = (w_offset + group_start) / group_size;
             float inv_scale = 1.0f / w.scales[scale_idx];
             sum += inv_scale * dot_i8_f32(
                 w.data + w_offset + group_start,
                 x.data + group_start,
-                GROUP_SIZE
+                group_size
             );
         }
 
-        size_t remaining_start = num_groups * GROUP_SIZE;
+        size_t remaining_start = num_groups * group_size;
         for (size_t j = remaining_start; j < d; j++){
             sum += w.get(w_offset + j) * x.data[j];
         }
@@ -247,5 +249,3 @@ void sqrt(Tensor<float>& xout, Tensor<float>& x){
         xout.data[i] = sqrt(x.data[i]);
     }
 }
-
-

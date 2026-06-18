@@ -54,6 +54,8 @@ Output:
 def quantize(x: torch.Tensor, n_bits: int, group_size: int):
     assert (x.numel() % group_size == 0)
 
+    x = x.to(torch.float32)
+
     # Split tensor in groups
     x = x.reshape(-1, group_size)
 

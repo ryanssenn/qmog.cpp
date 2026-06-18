@@ -119,7 +119,7 @@ int main() {
         std::cout << "  " << mark << "  " << name << "  "
                   << time_pad << paint(DIM, time_str) << std::endl;
 
-        if (!ok) {
+        if (!ok || t.name == "test prompt perplexity") {
             print_indented(captured.str());
         }
     }
