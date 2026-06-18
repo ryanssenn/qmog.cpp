@@ -6,7 +6,7 @@ Everything up to the first usable int8 generation path was built by hand: loadin
 
 Educational project for understanding LLM inference, not a production engine.
 
-Current status: int8 runs at ~4.9 tok/s on Apple M4; quality is still WIP due to numerical drift.
+Current status: int8 runs at ~4.9 tok/s on Apple M4.
 
 Independent project, not affiliated with Mistral AI.
 
@@ -116,24 +116,26 @@ The default int8 export is much faster on CPU than f32. Use f32 mainly for corre
 
 # Testing
 
-To check that the C++ code matches the real Mistral implementation, I validated each component separately rather than only checking end-to-end output.
+The test suite checks mistral.cpp against Hugging Face reference outputs at two levels: individual transformer components and short end-to-end language-model diagnostics.
 
-First, the Python scripts in `scripts/test/mistral/` run individual pieces, attention, RMSNorm, RoPE, MLP, etc. using Hugging Face's Mistral with the actual weights. Each script dumps its output tensors into `test/mistral/expected.txt` as named float arrays.
+The component tests validate the building blocks directly: tokenizer encode/decode, CPU kernels such as matmul, softmax, RoPE, and SiLU, plus transformer modules such as embedding, RMSNorm, attention, MLP/feed-forward, KV cache, decoder layer, and LM head. The Python scripts in `scripts/test/mistral/` generate golden tensors with Hugging Face Mistral weights, and the C++ tests in `test/mistral/` compare each local implementation against those values.
 
-Then the C++ tests in `test/mistral/` load those values and compare them against the output of the corresponding mistral.cpp code. For example, an attention test copies a known `hidden_state` from the golden file, runs `Attention::forward`, and checks that Q/K/V and the output match. The same pattern is used for the tokenizer, CPU kernels (matmul, softmax, RoPE, SiLU), and each decoder module. Comparisons use a tolerance of ±0.05.
-
-**End-to-end logits tests** (`test/mistral/logits_expected.txt`) compare multi-token greedy decoding against Hugging Face f32 reference:
-
-- Top-10 token IDs and logit values after the last prompt token and each of the next 5 greedy steps
-- Per-layer hidden states after the last prompt token (finds where int8 drift starts)
-
-Regenerate golden logits after changing prompts or the model (needs ~16 GB free RAM; quit any running `mistral.cpp` first):
+The end-to-end diagnostics live in `test/mistral/logits_expected.txt` and are regenerated with:
 
 ```bash
 python scripts/test/mistral/logits.py
 ```
 
-Optional per-layer hidden-state goldens (much heavier on memory):
+These diagnostics focus on prompt perplexity and logits/top-k behavior for two short prompts:
+
+```text
+Paris is the capital of
+The color of the sky is
+```
+
+The prompt perplexity test scores each next-token prediction inside those prompts. It reports per-prompt mean negative log likelihood and perplexity for the active C++ model alongside the Hugging Face reference values. This is intentionally a small diagnostic, not a corpus-level benchmark: the current prompts cover 5 and 6 scored token transitions.
+
+The same golden file also stores top-10 token IDs and logit values after the last prompt token and each of the next 5 greedy steps. Optional layer-stack goldens can be generated to inspect hidden states after the last prompt token:
 
 ```bash
 DUMP_LAYER_STACK=1 python scripts/test/mistral/logits.py
@@ -146,31 +148,25 @@ cmake --build build --target test_exec
 ./build/test_exec
 ```
 
-Tests are filtered by the quantization mode in `mistral.bin`. Golden values come from Hugging Face f32 weights. int8 runs component tests plus logits/layer-stack diagnostics (these fail when int8 drift breaks generation). The project is still dealing with numerical drift in the quantized path, so int8 output quality and long generations should be treated as work in progress. Re-export with `--quant f32` to run the full 19-test component suite.
+Tests are filtered by the quantization mode recorded in `mistral.bin`. Re-export with `--quant f32` to run the full f32 component suite:
 
-The runner prints a report (green checks on pass, red on fail) with per-test timing.
-
-**Expected result (default int8 export):**
-
-```text
-====================================================
-  mistral.cpp · test suite            model: int8
-====================================================
-
-  ✓  test logits multi top10               0.0 ms
-  ✓  test layer stack prefill              0.0 ms
-  ✓  load config                           0.0 ms
-  ✓  load weights                          9.9 ms
-  ✓  test attention feedforward mlp      290.2 ms
-  ✓  tokenizer encode                      0.3 ms
-  ✓  tokenizer encode fallback             0.0 ms
-
-----------------------------------------------------
-  PASSED   7 / 7        0 failed        300.4 ms
-====================================================
+```bash
+python3 export_mistral.py \
+  --model_dir ../Mistral-7B-v0.1 \
+  --out ./mistral.bin \
+  --quant f32
 ```
 
-**Expected result (f32 export):**
+The runner prints a compact report with per-test timing and diagnostic output for failing tests. The prompt perplexity test always prints its NLL/PPL summary.
+
+Example prompt perplexity output:
+
+```text
+[paris] tokens=5 mean_nll f32=3.28117 int8=3.24317 delta=-0.0379977 ppl f32=26.6069 int8=25.6149
+[sky] tokens=6 mean_nll f32=3.27475 int8=3.22071 delta=-0.0540431 ppl f32=26.4367 int8=25.0459
+```
+
+Example f32 component-suite output:
 
 ```text
 ====================================================
