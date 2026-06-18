@@ -172,6 +172,30 @@ std::vector<uint32_t> Tokenizer::encode(const std::string& text) const {
     return tokens;
 }
 
+static bool try_decode_byte_token(const std::string& token, char& out) {
+    // Vocab byte-fallback tokens use the form "<0x0A>" (see get_id).
+    if (token.size() != 6 || token[0] != '<' || token[1] != '0' ||
+        (token[2] != 'x' && token[2] != 'X') || token[5] != '>') {
+        return false;
+    }
+
+    auto hex_digit = [](char c) -> int {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        return -1;
+    };
+
+    int hi = hex_digit(token[3]);
+    int lo = hex_digit(token[4]);
+    if (hi < 0 || lo < 0) {
+        return false;
+    }
+
+    out = static_cast<char>((hi << 4) | lo);
+    return true;
+}
+
 std::string Tokenizer::decode_mistral(std::string s) const{
     std::string t = "▁";
     std::string result;
@@ -203,7 +227,13 @@ std::string Tokenizer::decode(const std::vector<uint32_t>& tokens) const {
     std::string result;
 
     for (auto& t : tokens) {
-        result += decode_mistral(id_to_token[t]);
+        const std::string& token = id_to_token[t];
+        char byte;
+        if (try_decode_byte_token(token, byte)) {
+            result += byte;
+        } else {
+            result += decode_mistral(token);
+        }
     }
 
     return result;

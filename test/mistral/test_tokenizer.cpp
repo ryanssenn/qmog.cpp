@@ -94,5 +94,38 @@ int test_tokenizer_decode(){
 
 static RegisterTest tokenizer_decode("tokenizer decode", "f32", &test_tokenizer_decode);
 
+int test_tokenizer_decode_byte_fallback(){
+    std::shared_ptr<Parameters> params = get_params();
+
+    auto it = params->tokenizer.token_to_id.find("<0x0A>");
+    if (it == params->tokenizer.token_to_id.end()) {
+        std::cout << "tokenizer decode fallback: <0x0A> not in vocab" << std::endl;
+        return 1;
+    }
+
+    std::string got = params->tokenizer.decode({it->second, it->second});
+    const std::string expected = "\n\n";
+
+    if (expected != got) {
+        std::cout << "tokenizer decode fallback: newline mismatch" << std::endl;
+        return 1;
+    }
+
+    const std::string text = "hello\nworld";
+    std::vector<uint32_t> ids = params->tokenizer.encode(text);
+    ids.erase(ids.begin());  // drop BOS; decode tests use raw token streams
+    std::string roundtrip = params->tokenizer.decode(ids);
+
+    if (roundtrip != " hello\nworld") {
+        std::cout << "tokenizer decode fallback: roundtrip mismatch" << std::endl;
+        return 1;
+    }
+
+    return 0;
+}
+
+static RegisterTest tokenizer_decode_fallback("tokenizer decode fallback", "f32", &test_tokenizer_decode_byte_fallback);
+static RegisterTest tokenizer_decode_fallback_q("tokenizer decode fallback", "int8", &test_tokenizer_decode_byte_fallback);
+
 
 
