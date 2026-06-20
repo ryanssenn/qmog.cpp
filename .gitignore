@@ -1,17 +1,21 @@
+# Hugging Face checkpoints and exported weights
 Mistral-7B-v0.1/
-changes.txt
-model.bin
-.idea/
-cmake-build-debug/
-__pycache__/
-venv
-scripts/test/output.txt
-mistral.bin
-mistral.mog
-mistral-int8.bin
-.DS_Store
-cmake-build-release-system/
-cmake-build-release/
+*.mog
+*.bin
+
+# Build
 build/
-.gitignore
+cmake-build-*/
+
+# Python
+venv/
+__pycache__/
+
+# IDE / OS
+.idea/
+.DS_Store
+
+# Local output
 output.txt
+changes.txt
+scripts/test/output.txt
