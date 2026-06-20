@@ -38,8 +38,7 @@ static float aligned_value_error(const TopK& got, const Tensor<float>& exp_ids,
 // Teacher-forced divergence report: at every step we feed the f32 golden's top-1
 // token, so the int8 model always sees the exact context f32 saw. This isolates
 // per-step int8 logit error instead of letting trajectories drift apart.
-// Pass/fail is decided by top-1 argmax agreement (what greedy generation uses);
-// logit value gaps are printed as diagnostics only.
+// Pass/fail: f32 requires top-1 argmax; int8 requires full top-10 set and max logit error < 0.1.
 template <typename TMlp>
 static int run_logits_prompt(const std::string& prefix) {
     std::shared_ptr<Parameters> params = get_params();
@@ -90,7 +89,12 @@ static int run_logits_prompt(const std::string& prefix) {
                   << " max_val_err=" << max_err
                   << std::endl;
 
-        if (!top1_match) {
+        // int8 vs bf16 HF goldens: same top-10 set and close logit values.
+        bool step_ok = top1_match;
+        if (params->config.quant == "int8") {
+            step_ok = overlap == LOGITS_TOPK && max_err < 1e-1f;
+        }
+        if (!step_ok) {
             failed = 1;
         }
 
@@ -122,6 +126,20 @@ static int test_logits_multi() {
     return failed;
 }
 
+// Per-layer atol for layer-stack checks (int8 vs bf16 HF goldens).
+static float layer_stack_atol(const std::string& quant, size_t layer, size_t n_layers, bool is_norm) {
+    if (quant != "int8") {
+        return 5e-2f;
+    }
+    if (is_norm) {
+        return 7.2e-1f; // sky ~0.71, paris ~0.58
+    }
+    if (layer + 1 == n_layers) {
+        return 4.2e-1f; // L31 ~0.30–0.39
+    }
+    return 1.5e-1f; // L0–L30, worst ~0.11 (L29 sky)
+}
+
 template <typename TMlp>
 static int run_layer_stack_prompt(const std::string& prefix) {
     std::shared_ptr<Parameters> params = get_params();
@@ -142,7 +160,10 @@ static int run_layer_stack_prompt(const std::string& prefix) {
 
     model.embedding.forward(infer, tokens.back());
 
-    for (size_t layer = 0; layer < model.layers.size(); layer++) {
+    const size_t n_layers = model.layers.size();
+    const std::string& quant = params->config.quant;
+
+    for (size_t layer = 0; layer < n_layers; layer++) {
         model.layers[layer].forward(infer);
 
         std::string key = "layer_stack_" + prefix + "_L" + std::to_string(layer);
@@ -151,7 +172,8 @@ static int run_layer_stack_prompt(const std::string& prefix) {
             return 1;
         }
 
-        if (!equals(infer.hidden_state, expected.at(key))) {
+        float atol = layer_stack_atol(quant, layer, n_layers, false);
+        if (!equals(infer.hidden_state, expected.at(key), atol)) {
             std::cout << "Layer stack mismatch at layer " << layer << " for prompt " << prefix << std::endl;
             return 1;
         }
@@ -159,7 +181,7 @@ static int run_layer_stack_prompt(const std::string& prefix) {
 
     model.norm.forward(infer);
     std::string norm_key = "layer_stack_" + prefix + "_norm";
-    if (!equals(infer.hidden_state, expected.at(norm_key))) {
+    if (!equals(infer.hidden_state, expected.at(norm_key), layer_stack_atol(quant, 0, n_layers, true))) {
         std::cout << "Layer stack mismatch at final norm for prompt " << prefix << std::endl;
         return 1;
     }

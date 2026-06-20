@@ -37,3 +37,4 @@ bool compare_topk_greedy_argmax(const TopK& got, const std::string& ids_key);
 
 bool equals(float x, float y);
 bool equals(const Tensor<float>& x, const Tensor<float>& y);
+bool equals(const Tensor<float>& x, const Tensor<float>& y, float atol);

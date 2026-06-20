@@ -72,15 +72,28 @@ def dump_logits_trace(f, model, input_ids, prefix):
 @torch.inference_mode()
 def dump_layer_stack(f, model, input_ids, prefix):
     attention_mask = torch.ones_like(input_ids)
+    pre_norm = {}
+
+    def capture_pre_norm(_module, inp, _output):
+        # HF hidden_states[num_layers] equals last_hidden_state (post-norm), not the
+        # final decoder block output. Hook the norm input for layer L{n-1} goldens.
+        pre_norm["last"] = inp[0][0, -1].detach().float().cpu()
+
+    handle = model.model.norm.register_forward_hook(capture_pre_norm)
     out = model.model(
         input_ids,
         attention_mask=attention_mask,
         output_hidden_states=True,
         use_cache=False,
     )
+    handle.remove()
 
-    for layer in range(model.config.num_hidden_layers):
-        dump_vector(f, f"layer_stack_{prefix}_L{layer}", out.hidden_states[layer + 1][0, -1])
+    n_layers = model.config.num_hidden_layers
+    for layer in range(n_layers):
+        if layer == n_layers - 1:
+            dump_vector(f, f"layer_stack_{prefix}_L{layer}", pre_norm["last"])
+        else:
+            dump_vector(f, f"layer_stack_{prefix}_L{layer}", out.hidden_states[layer + 1][0, -1])
 
     dump_vector(f, f"layer_stack_{prefix}_norm", out.last_hidden_state[0, -1])
 
