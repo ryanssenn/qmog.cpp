@@ -26,7 +26,7 @@ The C++ engine lives under `src/`. Each file maps to one layer of the stack abov
 The CLI entry point. Parses arguments (`<model_path>`, `<prompt>`, `--temp`, `--ppl`), loads the model, tokenizes the prompt, and either runs text generation or teacher-forced perplexity. Generation prefills the prompt through the model, then loops up to 70 tokens: forward pass, repetition penalty, sampling (greedy or temperature-scaled multinomial), decode, and stream to stdout.
 
 ### `src/loader/parameters.cpp`
-Loads `mistral.bin`. Reads the JSON header for config, vocabulary, merges, and tensor offsets; memory-maps the weight blob; and exposes `Tensor` views for every layer weight. Also wires up the tokenizer tables from the header.
+Loads `mistral.mog`. Parses the MOG (Model Object Graph) header for config, vocabulary, merges, and tensor offsets; memory-maps the weight blob; and exposes `Tensor` views for every layer weight. Also wires up the tokenizer tables from the header.
 
 ### `src/tokenizer/tokenizer.cpp`
 Mistral-compatible BPE tokenizer. Applies Metaspace pre-tokenization, merges token pairs by rank, and falls back to per-byte vocab entries (`<0x0A>`, etc.) for bytes not covered by merges. `decode` reverses metaspace spacing and byte-fallback tokens back into UTF-8 text.
@@ -46,7 +46,7 @@ The transformer itself. Implements `Embedding`, `RMSNorm`, `RotaryEmbedding`, gr
 
 #### Model Loader
 - [x] **Model binary converter** *(export_mistral.py)*  
-  Converts a Hugging Face Mistral model (config, vocab/merges, and weights) into a single standardized binary file, optionally applying quantization. It uses a JSON header to store model metadata, vocabulary, merges, and tensor index information, followed by all model weights packed sequentially as contiguous floating point data.
+  Converts a Hugging Face Mistral model (config, vocab/merges, and weights) into a single standardized MOG file (`mistral.mog`), optionally applying quantization. It uses a compact MOG binary header to store model metadata, vocabulary, merges, and tensor index information, followed by all model weights packed sequentially as contiguous floating point data.
 - [x] **In-memory loader** *(src/loader/parameters.cpp)*  
   Memory-maps the binary, loads the config and provides direct tensor views.
 

@@ -14,7 +14,7 @@
 #   ./perplexity.sh --help
 #
 # Env overrides:
-#   MODEL_BIN   engine model binary (default: ./mistral.bin)
+#   MODEL_MOG   engine model file (default: ./mistral.mog)
 #   PYTHON      python interpreter for the HF script (default: python3)
 
 set -euo pipefail
@@ -22,7 +22,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
-MODEL_BIN="${MODEL_BIN:-./mistral.bin}"
+MODEL_MOG="${MODEL_MOG:-./mistral.mog}"
 ENGINE="./build/mistral.cpp"
 PYTHON="${PYTHON:-python3}"
 HF_SCRIPT="scripts/test/mistral/perplexity.py"
@@ -52,7 +52,7 @@ fi
 prompt="${prompt%$'\n'}"
 
 [ -x "$ENGINE" ] || { echo "Engine not built: $ENGINE (run: cmake --build build)" >&2; exit 1; }
-[ -f "$MODEL_BIN" ] || { echo "Model binary not found: $MODEL_BIN" >&2; exit 1; }
+[ -f "$MODEL_MOG" ] || { echo "Model file not found: $MODEL_MOG" >&2; exit 1; }
 
 prompt_sha="$(printf '%s' "$prompt" | sha1sum | cut -d' ' -f1)"
 
@@ -85,7 +85,7 @@ fi
 
 # --- int8 engine perplexity (fast path) --------------------------------------
 echo "Computing int8 engine perplexity..."
-eng_out="$("$ENGINE" "$MODEL_BIN" "$prompt" --ppl)"
+eng_out="$("$ENGINE" "$MODEL_MOG" "$prompt" --ppl)"
 int8_ppl="$(printf '%s\n' "$eng_out" | grep -E '^perplexity:' | awk '{print $2}')"
 int8_tokens="$(printf '%s\n' "$eng_out" | grep -E '^tokens:' | awk '{print $2}')"
 [ -n "$int8_ppl" ] || { echo "Failed to parse engine perplexity from:" >&2; echo "$eng_out" >&2; exit 1; }

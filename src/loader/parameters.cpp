@@ -1,23 +1,23 @@
 #include "../../include/parameters.h"
+#include "../../include/model_format.h"
+#include "../../include/binary_reader.h"
 #include <iostream>
+#include <cstring>
 
-#include <fcntl.h>     // declares open()
-#include <unistd.h>    // declares close()
-#include <sys/mman.h>  // declares mmap()
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 
-// Memory-map the model file into virtual address space and return base pointer.
-void* Parameters::map_file(int fd){
-    // Get the size of the binary file
+void* Parameters::map_file(int fd, size_t& size){
     struct stat st;
     if (fstat(fd, &st) < 0){
         std::cerr << "Model binary get size failed" << std::endl;
         std::exit(1);
     }
 
-    size_t size = st.st_size;
+    size = st.st_size;
 
-    // Load the file into virtual memory
     void* p = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
 
     if (p == MAP_FAILED){
@@ -28,71 +28,97 @@ void* Parameters::map_file(int fd){
     return p;
 }
 
-// Extract model hyperparameters from JSON header into a Config struct.
-void Parameters::load_config(nlohmann::json& header){
-    nlohmann::json m = header["metadata"];
+void Parameters::load_config(BinaryReader& reader){
+    uint32_t count = reader.read_u32();
 
-    config.hidden_size       = std::stoi(m["hidden_size"].get<std::string>());
-    config.intermediate_size = std::stoi(m["intermediate_size"].get<std::string>());
-    config.n_layers          = std::stoi(m["n_layers"].get<std::string>());
-    config.n_heads           = std::stoi(m["n_heads"].get<std::string>());
-    config.n_kv_heads        = std::stoi(m["n_kv_heads"].get<std::string>());
-    config.vocab_size        = std::stoi(m["vocab_size"].get<std::string>());
-    config.sliding_window    = std::stoi(m["sliding_window"].get<std::string>());
-    config.rope_theta        = std::stof(m["rope_theta"].get<std::string>());
-    config.norm_eps          = std::stof(m["norm_eps"].get<std::string>());
-    config.max_position_embeddings = std::stoi(m["max_position_embeddings"].get<std::string>());
-    config.head_dim          = config.hidden_size / config.n_heads;
-    config.quant             = m["quant"].get<std::string>();
+    for (uint32_t i = 0; i < count; i++){
+        std::string key = reader.read_string();
+        uint8_t type = reader.read_u8();
+
+        if (key == "hidden_size" && type == static_cast<uint8_t>(model_format::KVType::UINT32)){
+            config.hidden_size = reader.read_u32();
+        } else if (key == "intermediate_size" && type == static_cast<uint8_t>(model_format::KVType::UINT32)){
+            config.intermediate_size = reader.read_u32();
+        } else if (key == "n_layers" && type == static_cast<uint8_t>(model_format::KVType::UINT32)){
+            config.n_layers = reader.read_u32();
+        } else if (key == "n_heads" && type == static_cast<uint8_t>(model_format::KVType::UINT32)){
+            config.n_heads = reader.read_u32();
+        } else if (key == "n_kv_heads" && type == static_cast<uint8_t>(model_format::KVType::UINT32)){
+            config.n_kv_heads = reader.read_u32();
+        } else if (key == "vocab_size" && type == static_cast<uint8_t>(model_format::KVType::UINT32)){
+            config.vocab_size = reader.read_u32();
+        } else if (key == "sliding_window" && type == static_cast<uint8_t>(model_format::KVType::UINT32)){
+            config.sliding_window = reader.read_u32();
+        } else if (key == "max_position_embeddings" && type == static_cast<uint8_t>(model_format::KVType::UINT32)){
+            config.max_position_embeddings = reader.read_u32();
+        } else if (key == "rope_theta" && type == static_cast<uint8_t>(model_format::KVType::FLOAT32)){
+            config.rope_theta = reader.read_f32();
+        } else if (key == "norm_eps" && type == static_cast<uint8_t>(model_format::KVType::FLOAT32)){
+            config.norm_eps = reader.read_f32();
+        } else if (key == "quant" && type == static_cast<uint8_t>(model_format::KVType::STRING)){
+            config.quant = reader.read_string();
+        } else {
+            if (type == static_cast<uint8_t>(model_format::KVType::STRING)){
+                reader.read_string();
+            } else if (type == static_cast<uint8_t>(model_format::KVType::UINT32)){
+                reader.read_u32();
+            } else if (type == static_cast<uint8_t>(model_format::KVType::FLOAT32)){
+                reader.read_f32();
+            }
+        }
+    }
+
+    config.head_dim = config.hidden_size / config.n_heads;
 }
 
-void Parameters::load_tensor(std::unordered_map<std::string, std::variant<Tensor<float>, Tensor<int8_t>>>& m, char* p, const std::string& key, nlohmann::json& value){
-    std::string type = value["dtype"];
-    uint64_t offset = value["offset"];
-    std::vector<size_t> shape = value["shape"];
-
-    if (type == "f32"){
+void Parameters::load_tensor(std::unordered_map<std::string, std::variant<Tensor<float>, Tensor<int8_t>>>& m, char* p, const std::string& key, uint8_t dtype, const std::vector<size_t>& shape, uint64_t offset, uint64_t scale_offset, uint32_t scale_size){
+    if (dtype == static_cast<uint8_t>(model_format::DType::F32)){
         Tensor<float> t = Tensor(reinterpret_cast<float*>(p + offset), shape);
         m.insert({key, t});
     }
-    else if (type == "int8"){
-        uint64_t scale_offset = value["scale_offset"];
-        uint64_t scale_size = value["scale_size"];
-
+    else if (dtype == static_cast<uint8_t>(model_format::DType::INT8)){
         float* scale_start = reinterpret_cast<float*>(p + scale_offset);
-
-        Tensor<int8_t> t = Tensor(reinterpret_cast<int8_t*>(p + offset), std::vector<float>(scale_start, scale_start+scale_size), shape);
+        Tensor<int8_t> t = Tensor(reinterpret_cast<int8_t*>(p + offset), std::vector<float>(scale_start, scale_start + scale_size), shape);
         m.insert({key, t});
     }
 }
 
-// Load Tensor views for all weights using offsets from the JSON header.
-void Parameters::load_weights(char* p, nlohmann::json& header){
-    // Init empty maps per layer
+void Parameters::load_weights(char* p, BinaryReader& reader){
     layer_weights.resize(config.n_layers);
 
-    nlohmann::json t = header["tensors"];
+    uint32_t count = reader.read_u32();
     const std::string model_prefix = "model.layers.";
 
-    for (auto& [key, value] : t.items()){
+    for (uint32_t i = 0; i < count; i++){
+        std::string key = reader.read_string();
+        uint8_t dtype = reader.read_u8();
+        uint8_t ndim = reader.read_u8();
 
-        // Layer-specific weight
+        std::vector<size_t> shape;
+        shape.reserve(ndim);
+        for (int d = 0; d < 4; d++){
+            uint32_t dim = reader.read_u32();
+            if (d < ndim){
+                shape.push_back(dim);
+            }
+        }
+
+        uint64_t offset = reader.read_u64();
+        uint64_t scale_offset = reader.read_u64();
+        uint32_t scale_size = reader.read_u32();
+
         if (key.compare(0, model_prefix.size(), model_prefix) == 0){
-            // Extract the layer number
             std::string rest = key.substr(model_prefix.size());
-            int i = std::stoi(rest.substr(0, rest.find(".")));
-
-            load_tensor(layer_weights[i], p, rest.substr(rest.find(".") + 1), value);
+            int layer = std::stoi(rest.substr(0, rest.find(".")));
+            load_tensor(layer_weights[layer], p, rest.substr(rest.find(".") + 1), dtype, shape, offset, scale_offset, scale_size);
             continue;
         }
 
-        // Otherwise global weight
-        load_tensor(global_weights, p, key, value);
+        load_tensor(global_weights, p, key, dtype, shape, offset, scale_offset, scale_size);
     }
 }
 
 void Parameters::load_parameters(const std::string& path){
-    // Get file descriptor
     int fd = open(path.c_str(), O_RDONLY);
 
     if (fd < 0){
@@ -100,29 +126,49 @@ void Parameters::load_parameters(const std::string& path){
         std::exit(1);
     }
 
-    // Read the 8 byte header uint64_t size
+    size_t file_size = 0;
+    void* mapped = map_file(fd, file_size);
+    char* base = static_cast<char*>(mapped);
+
+    if (file_size < model_format::FILE_PREFIX_SIZE){
+        std::cerr << "unsupported format: file too small" << std::endl;
+        std::exit(1);
+    }
+
+    if (std::memcmp(base, model_format::MAGIC, 4) != 0){
+        std::cerr << "unsupported format: expected MOG magic" << std::endl;
+        std::exit(1);
+    }
+
+    uint32_t version;
+    std::memcpy(&version, base + 4, sizeof(version));
+    if (version != model_format::FORMAT_VERSION){
+        std::cerr << "unknown format version: " << version << std::endl;
+        std::exit(1);
+    }
+
     uint64_t header_size;
-    read(fd, &header_size, sizeof(header_size));
+    std::memcpy(&header_size, base + 8, sizeof(header_size));
 
-    // Read and parse the JSON Header
-    char* header = new char[header_size+1];
-    read(fd, header, header_size);
-    header[header_size] = '\0';
-    nlohmann::json header_json = nlohmann::json::parse(std::string(header));
+    size_t header_start = model_format::FILE_PREFIX_SIZE;
+    size_t header_end = header_start + header_size;
+    if (header_end > file_size){
+        std::cerr << "truncated header" << std::endl;
+        std::exit(1);
+    }
 
-    load_config(header_json);
-    tokenizer.load(header_json["tokenizer"]);
+    BinaryReader reader(base + header_start, header_size);
+    reader.read_string(); // architecture (e.g. "mistral")
+    load_config(reader);
+    tokenizer.load(reader);
 
-    // Map file into virtual memory
-    void* p = map_file(fd);
+    size_t payload_base = (header_end + 63) & ~size_t(63);
+    if (payload_base > file_size){
+        std::cerr << "truncated payload" << std::endl;
+        std::exit(1);
+    }
 
-    // The blob of tensors starts after header_size uint64 and the header
-    char* start = static_cast<char*>(p) + header_size + sizeof(uint64_t);
-
-    // Load tensor weights to pointers in mmap
-    load_weights(start, header_json);
-
-    delete[] header;
+    load_weights(base + payload_base, reader);
 
     close(fd);
 }
@@ -152,5 +198,4 @@ Tensor<T> Parameters::get_tensor(int layer, const std::string& name){
 
 template Tensor<float> Parameters::get_tensor<float>(int, const std::string&);
 template Tensor<int8_t> Parameters::get_tensor<int8_t>(int, const std::string&);
-
 

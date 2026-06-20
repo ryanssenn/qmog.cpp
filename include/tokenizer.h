@@ -1,6 +1,6 @@
 #pragma once
 #include "tensor.h"
-#include "json.hpp"
+#include "binary_reader.h"
 
 struct Tokenizer {
     // Vocab lookup tables
@@ -22,7 +22,7 @@ struct Tokenizer {
     uint64_t get_lowest_pair(std::vector<uint32_t>& tokens) const;
     std::vector<uint32_t> merge(std::vector<uint32_t>& tokens, uint32_t left, uint32_t right, uint32_t merged) const;
 
-    void load(nlohmann::json tokenizer);
+    void load(BinaryReader& reader);
 
     std::string pre_tokenize_mistral(const std::string& text) const;
     std::vector<uint32_t> encode(const std::string& text) const;

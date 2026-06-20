@@ -7,6 +7,7 @@ __pycache__/
 venv
 scripts/test/output.txt
 mistral.bin
+mistral.mog
 mistral-int8.bin
 .DS_Store
 cmake-build-release-system/

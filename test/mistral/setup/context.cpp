@@ -14,9 +14,9 @@ std::shared_ptr<Parameters> get_params(){
         return params;
     }
 
-    std::string model_path = "mistral.bin";
+    std::string model_path = "mistral.mog";
     if (!std::ifstream(model_path).good()) {
-        model_path = "../mistral.bin";
+        model_path = "../mistral.mog";
     }
 
     params->load_parameters(model_path);

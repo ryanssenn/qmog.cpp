@@ -17,13 +17,13 @@ git clone https://github.com/ryanssenn/mistral.cpp.git
 cd mistral.cpp
 ```
 
-Export `mistral.bin` (~18 GB) from the Hugging Face weights.
+Export `mistral.mog` (~18 GB) from the Hugging Face weights. The file uses the MOG (Model Object Graph) binary format; see [docs/model-binary.md](docs/model-binary.md).
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-python3 export_mistral.py --model_dir ../Mistral-7B-v0.1 --out ./mistral.bin
+python3 export_mistral.py --model_dir ../Mistral-7B-v0.1 --out ./mistral.mog
 ```
 
 Build and run.
@@ -31,7 +31,7 @@ Build and run.
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-./build/mistral.cpp ./mistral.bin "Paris is the capital of" --temp 0.7
+./build/mistral.cpp ./mistral.mog "Paris is the capital of" --temp 0.7
 ```
 
 Use `--temp 0` for greedy decoding.

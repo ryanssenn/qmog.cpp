@@ -1,5 +1,6 @@
 #include "../../include/tokenizer.h"
 #include <iostream>
+#include <algorithm>
 
 
 uint64_t Tokenizer::pack(uint32_t left, uint32_t right) const{
@@ -34,27 +35,35 @@ std::vector<uint32_t> Tokenizer::get_id(const std::string& token) const{
 }
 
 
-void Tokenizer::load(nlohmann::json tokenizer){
-    id_to_token.resize(tokenizer["vocab"].size());
+void Tokenizer::load(BinaryReader& reader){
+    uint32_t vocab_count = reader.read_u32();
+    uint32_t max_id = 0;
 
-    int t = 0;
+    std::vector<std::pair<std::string, uint32_t>> vocab_entries;
+    vocab_entries.reserve(vocab_count);
 
-    // Load vocabulary tables
-    for (auto& [key, value] : tokenizer["vocab"].items()){
-        // Bytes in the vocab JSON are written as strings representation "<0x01>" not actual bytes
-        int id = value;
-        id_to_token[id] = key;
-        token_to_id[key] = id;
+    for (uint32_t i = 0; i < vocab_count; i++){
+        std::string token = reader.read_string();
+        uint32_t id = reader.read_u32();
+        vocab_entries.emplace_back(token, id);
+        max_id = std::max(max_id, id);
     }
 
-    // Load BPE merge map
-    int i = 0;
-    for (auto& item : tokenizer["merges"]){
-        std::string merge = item.get<std::string>();
+    id_to_token.assign(max_id + 1, "");
+    token_to_id.clear();
+
+    for (auto& [token, id] : vocab_entries){
+        id_to_token[id] = token;
+        token_to_id[token] = id;
+    }
+
+    uint32_t merge_count = reader.read_u32();
+    for (uint32_t i = 0; i < merge_count; i++){
+        std::string merge = reader.read_string();
 
         size_t s = merge.find(" ");
         std::string token1 = merge.substr(0, s);
-        std::string token2 = merge.substr(s+1);
+        std::string token2 = merge.substr(s + 1);
 
         uint32_t id1 = token_to_id[token1];
         uint32_t id2 = token_to_id[token2];
@@ -63,7 +72,6 @@ void Tokenizer::load(nlohmann::json tokenizer){
 
         merge_to_rank[packed] = i;
         merge_to_id[packed] = token_to_id[token1 + token2];
-        i++;
     }
 }
 

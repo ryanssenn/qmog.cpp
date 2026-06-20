@@ -49,7 +49,7 @@ static void compare(const std::string& label, const Tensor<float>& h,
 }
 
 int main(int argc, char** argv) {
-    std::string model_path = "mistral.bin";
+    std::string model_path = "mistral.mog";
     bool use_rope = false;
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
