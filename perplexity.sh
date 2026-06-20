@@ -23,7 +23,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
 MODEL_MOG="${MODEL_MOG:-./mistral.mog}"
-ENGINE="./build/mistral.cpp"
+ENGINE="./build/mog-cli"
 PYTHON="${PYTHON:-python3}"
 HF_SCRIPT="scripts/test/mistral/perplexity.py"
 PROMPT_FILE="scripts/perplexity_prompt.txt"

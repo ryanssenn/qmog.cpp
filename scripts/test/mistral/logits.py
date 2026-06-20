@@ -1,7 +1,7 @@
 """
 Generate test/mistral/logits_expected.txt for multi-token logits and layer-stack tests.
 
-Matches mistral.cpp greedy decoding (temp=0).
+Matches mog-cli greedy decoding (temp=0).
 
 Weights load in bfloat16 (Mistral's native dtype) so the ~7B model fits in RAM
 without swapping; a full f32 copy is ~28 GB and thrashes on a 32 GB machine.

@@ -1,6 +1,6 @@
 # Architecture
 
-mistral.cpp is a from-scratch C++ inference engine for Mistral 7B. At a high level it does one thing: **predict the next token, append it, repeat**.
+mog.cpp is a from-scratch C++ inference engine for `.mog` model files. At a high level it does one thing: **predict the next token, append it, repeat**.
 
 ```
   prompt text
@@ -77,7 +77,7 @@ The chosen ID is decoded to text, printed, and fed back into step 3 until a stop
 
 | Step | Where |
 |------|-------|
-| CLI, generation loop, sampling | `src/main.cpp` |
+| CLI (`mog-cli`), generation loop, sampling | `src/main.cpp` |
 
 ---
 
@@ -85,7 +85,7 @@ The chosen ID is decoded to text, printed, and fed back into step 3 until a stop
 
 | Path | Role |
 |------|------|
-| `src/main.cpp` | CLI: load model, tokenize, generate or `--ppl` perplexity |
+| `src/main.cpp` | `mog-cli`: load model, tokenize, generate or `--ppl` perplexity |
 | `src/loader/parameters.cpp` | Parse `.mog` header, mmap weights |
 | `src/tokenizer/tokenizer.cpp` | BPE encode/decode |
 | `src/common/tensor.cpp` | f32 and int8 tensor views (on-the-fly dequant) |

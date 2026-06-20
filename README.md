@@ -1,6 +1,6 @@
-# mistral.cpp
+# mog.cpp
 
-C++ Mistral 7B inference on CPU. On an Apple M4 Mac: 4.36 tok/s, perplexity 5.24.
+C++ CPU inference engine for `.mog` models. On an Apple M4 Mac with Mistral 7B: 4.36 tok/s, perplexity 5.24.
 
 <img width="1200" height="331" alt="mistral_demo" src="https://github.com/user-attachments/assets/2660a8e4-c444-44da-8e19-bd70ea76449a" />
 
@@ -13,8 +13,8 @@ C++ Mistral 7B inference on CPU. On an Apple M4 Mac: 4.36 tok/s, perplexity 5.24
 ```bash
 git lfs install
 git clone https://huggingface.co/mistralai/Mistral-7B-v0.1
-git clone https://github.com/ryanssenn/mistral.cpp.git
-cd mistral.cpp
+git clone https://github.com/ryanssenn/mog.cpp.git
+cd mog.cpp
 ```
 
 **2. Build a `.mog` file.** The engine reads a single `.mog` (Model Object Graph) file with config, tokenizer, and weights. Use `export_mistral.py` to convert the Hugging Face checkpoint:
@@ -36,7 +36,7 @@ cmake --build build
 **4. Run:**
 
 ```bash
-./build/mistral.cpp ./mistral.mog "Paris is the capital of" --temp 0.7
+./build/mog-cli ./mistral.mog "Paris is the capital of" --temp 0.7
 ```
 
 Use `--temp 0` for greedy decoding.

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(mistral.cpp CXX)
+project(mog.cpp CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -23,10 +23,10 @@ file(GLOB_RECURSE SRC CONFIGURE_DEPENDS "src/*.cpp")
 file(GLOB_RECURSE TEST_MISTRAL CONFIGURE_DEPENDS "test/mistral/*.cpp")
 list(REMOVE_ITEM SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
 
-add_executable(mistral.cpp src/main.cpp ${SRC})
+add_executable(mog-cli src/main.cpp ${SRC})
 add_executable(test_exec ${SRC} ${TEST_MISTRAL})
 
 if(NOT APPLE)
-    target_link_libraries(mistral.cpp PRIVATE OpenMP::OpenMP_CXX)
+    target_link_libraries(mog-cli PRIVATE OpenMP::OpenMP_CXX)
     target_link_libraries(test_exec PRIVATE OpenMP::OpenMP_CXX)
 endif()
