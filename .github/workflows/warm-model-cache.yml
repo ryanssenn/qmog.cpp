@@ -1,55 +1,49 @@
 name: Warm model cache
 
-# One-time (or after export_mistral.py changes): download HF checkpoint,
-# export Q8F16 mistral.mog, and save to Actions cache. PR CI restores
-# from cache only — it does not download the model.
+# Download the pre-exported .mog from Hugging Face and save to Actions cache.
+# CI restores from cache on each run; re-run this after publishing a new model revision.
 
 on:
   workflow_dispatch:
 
+env:
+  HF_MOG_REPO: QmogAI/Mistral-7B-Q8F16
+  MODEL_MOG: mistral-7B-Q8F16.mog
+
 jobs:
   warm:
     runs-on: macos-14
-    timeout-minutes: 180
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Restore HF checkpoint cache
+      - name: Get HF model revision
+        id: hf-rev
+        run: |
+          python3 -m pip install -q huggingface_hub
+          sha=$(python3 -c "from huggingface_hub import HfApi; print(HfApi().repo_info('${{ env.HF_MOG_REPO }}').sha)")
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore model cache
+        id: model-cache
         uses: actions/cache/restore@v4
         with:
-          path: Mistral-7B-v0.1
-          key: hf-mistral-7b-v0.1
+          path: ${{ env.MODEL_MOG }}
+          key: mog-${{ steps.hf-rev.outputs.sha }}
 
-      - name: Restore mistral.mog cache
-        id: mog-restore
-        uses: actions/cache/restore@v4
-        with:
-          path: mistral.mog
-          key: mog-${{ hashFiles('export_mistral.py', 'requirements.txt') }}
-
-      - name: Install OpenMP
-        run: brew install libomp
-
-      - name: Build export dependencies
-        if: steps.mog-restore.outputs.cache-hit != 'true'
+      - name: Download model
+        if: steps.model-cache.outputs.cache-hit != 'true'
         run: bash scripts/ci/prepare_model.sh
 
-      - name: Save HF checkpoint cache
-        if: steps.mog-restore.outputs.cache-hit != 'true'
+      - name: Save model cache
+        if: steps.model-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: Mistral-7B-v0.1
-          key: hf-mistral-7b-v0.1
-
-      - name: Save mistral.mog cache
-        if: steps.mog-restore.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: mistral.mog
-          key: mog-${{ hashFiles('export_mistral.py', 'requirements.txt') }}
+          path: ${{ env.MODEL_MOG }}
+          key: mog-${{ steps.hf-rev.outputs.sha }}
 
       - name: Verify
         run: |
-          ls -lh mistral.mog
-          echo "Cache warm. PR CI will restore mistral.mog (~2-5 min per run)."
+          ls -lh "${{ env.MODEL_MOG }}"
+          echo "Cache warm. CI will restore ${{ env.MODEL_MOG }} from cache (~2-5 min per run)."

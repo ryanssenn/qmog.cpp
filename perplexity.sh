@@ -15,7 +15,7 @@
 #   ./perplexity.sh --help
 #
 # Env overrides:
-#   MODEL_MOG   engine model file (default: ./mistral.mog)
+#   MODEL_MOG   engine model file (default: ./mistral-7B-Q8F16.mog)
 #   PYTHON      python interpreter for the HF script (default: python3)
 #   PPL_ATOL    max allowed PPL increase for --check (default: 0.001)
 
@@ -24,8 +24,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
-MODEL_MOG="${MODEL_MOG:-./mistral.mog}"
-ENGINE="./build/mog-cli"
+MODEL_MOG="${MODEL_MOG:-./mistral-7B-Q8F16.mog}"
+ENGINE="./build/qmog-cli"
 PYTHON="${PYTHON:-python3}"
 HF_SCRIPT="scripts/test/mistral/perplexity.py"
 PROMPT_FILE="scripts/perplexity_prompt.txt"

@@ -72,7 +72,7 @@ int main() {
     std::cout << std::endl;
     std::cout << paint(BOLD + ";" + CYAN, rule('=', width)) << std::endl;
     {
-        std::string title = "  mog.cpp \xC2\xB7 test suite";
+        std::string title = "  qmog.cpp \xC2\xB7 test suite";
         std::string model = "model: " + quant + "  ";
         size_t pad = width > title.size() + model.size()
                          ? width - title.size() - model.size()

@@ -1,6 +1,6 @@
 # F16 compute roadmap
 
-This document describes how mog.cpp will evolve from **f16 storage + f32 compute** (current) toward **native f16 compute on Apple ARM**, while keeping perplexity as the stability gate.
+This document describes how qmog.cpp will evolve from **f16 storage + f32 compute** (current) toward **native f16 compute on Apple ARM**, while keeping perplexity as the stability gate.
 
 For the on-disk format, see [model-binary.md](model-binary.md).
 

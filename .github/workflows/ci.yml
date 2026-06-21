@@ -9,30 +9,52 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  HF_MOG_REPO: QmogAI/Mistral-7B-Q8F16
+  MODEL_MOG: mistral-7B-Q8F16.mog
+
 jobs:
   test:
     runs-on: macos-14
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Restore mistral.mog
+      - name: Get HF model revision
+        id: hf-rev
+        run: |
+          python3 -m pip install -q huggingface_hub
+          sha=$(python3 -c "from huggingface_hub import HfApi; print(HfApi().repo_info('${{ env.HF_MOG_REPO }}').sha)")
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore model cache
+        id: model-cache
         uses: actions/cache/restore@v4
         with:
-          path: mistral.mog
-          key: mog-${{ hashFiles('export_mistral.py', 'requirements.txt') }}
+          path: ${{ env.MODEL_MOG }}
+          key: mog-${{ steps.hf-rev.outputs.sha }}
           restore-keys: |
             mog-
 
-      - name: Require cached model
+      - name: Download model
+        if: steps.model-cache.outputs.cache-hit != 'true'
+        run: bash scripts/ci/prepare_model.sh
+
+      - name: Save model cache
+        if: steps.model-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.MODEL_MOG }}
+          key: mog-${{ steps.hf-rev.outputs.sha }}
+
+      - name: Verify model
         run: |
-          if [ ! -f mistral.mog ]; then
-            echo "::error::mistral.mog not in Actions cache."
-            echo "Run the 'Warm model cache' workflow from the Actions tab (once per export change)."
+          if [ ! -f "${{ env.MODEL_MOG }}" ]; then
+            echo "::error::${{ env.MODEL_MOG }} missing after download."
             exit 1
           fi
-          echo "Using cached model ($(du -h mistral.mog | cut -f1))"
+          echo "Using model ($(du -h "${{ env.MODEL_MOG }}" | cut -f1))"
 
       - name: Install OpenMP
         run: brew install libomp

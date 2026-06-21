@@ -13,9 +13,9 @@ namespace {
 using TensorVariant = std::variant<Tensor<float>, Tensor<int8_t>, Tensor<fp16_t>>;
 
 std::string resolve_model_path() {
-    std::string model_path = "mistral.mog";
+    std::string model_path = "mistral-7B-Q8F16.mog";
     if (!std::ifstream(model_path).good()) {
-        model_path = "../mistral.mog";
+        model_path = "../mistral-7B-Q8F16.mog";
     }
     return model_path;
 }
