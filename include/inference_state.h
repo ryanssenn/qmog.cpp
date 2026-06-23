@@ -1,6 +1,7 @@
 #pragma once
 #include "tensor.h"
 #include "parameters.h"
+#include "fp16.h"
 
 inline size_t MAX_SEQ_LEN = 500;
 
@@ -21,8 +22,8 @@ struct InferenceState {
     Tensor<float> k_state; // [n_kv_heads, head_dim]
     Tensor<float> v_state; // [n_kv_heads, head_dim]
 
-    Tensor<float> k_cache; // [n_layer, n_kv_heads, seq_len, head_dim]
-    Tensor<float> v_cache; // [n_layer, n_kv_heads, seq_len, head_dim]
+    Tensor<fp16_t> k_cache; // [n_layer, n_kv_heads, seq_len, head_dim]
+    Tensor<fp16_t> v_cache; // [n_layer, n_kv_heads, seq_len, head_dim]
 
     Tensor<float> scores; // [n_heads, seq_len]
     Tensor<float> context; // [n_heads, head_dim]
@@ -36,8 +37,15 @@ struct InferenceState {
 
     void push_kv(size_t i){
         for (size_t h=0;h<config.n_kv_heads;h++){
-            k_cache.at({i, h, pos}).copy_from(k_state.at({h}));
-            v_cache.at({i, h, pos}).copy_from(v_state.at({h}));
+            Tensor<fp16_t> k_dst = k_cache.at({i, h, pos});
+            Tensor<fp16_t> v_dst = v_cache.at({i, h, pos});
+            Tensor<float> k_src = k_state.at({h});
+            Tensor<float> v_src = v_state.at({h});
+
+            for (size_t j = 0; j < config.head_dim; j++) {
+                k_dst.data[j] = f32_to_fp16(k_src.data[j]);
+                v_dst.data[j] = f32_to_fp16(v_src.data[j]);
+            }
         }
     }
 

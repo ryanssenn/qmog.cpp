@@ -7,6 +7,7 @@
 template <typename WeightT, typename ActivationT, typename AccumT>
 void matmul(Tensor<AccumT>& xout, Tensor<WeightT>& w, Tensor<ActivationT>& x);
 void row_matmul(Tensor<float>& xout, Tensor<float>& x, Tensor<float>& w);
+void row_matmul(Tensor<float>& xout, Tensor<float>& x, Tensor<fp16_t>& w);
 
 void softmax(Tensor<float>& xout, Tensor<float>& x);
 void rope(Tensor<float>& xout, Tensor<float>& x, Tensor<float>& cos, Tensor<float>& sin);

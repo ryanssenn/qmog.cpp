@@ -240,6 +240,22 @@ void row_matmul(Tensor<float>& xout, Tensor<float>& x, Tensor<float>& w){
     }
 }
 
+void row_matmul(Tensor<float>& xout, Tensor<float>& x, Tensor<fp16_t>& w){
+    size_t n = w.shape[0];
+    size_t d = w.shape[1];
+
+    assert(x.shape[0] == n && xout.numel >= d && "matmul shape mismatch");
+
+    #pragma omp parallel for
+    for (int i=0; i<(int)d; i++){
+        float sum = 0.f;
+        for (size_t j=0; j<n; j++){
+            sum += fp16_to_f32(w.data[j * d + i]) * x.data[j];
+        }
+        xout.data[i] = sum;
+    }
+}
+
 
 // e^x / sum(e^x)
 // Here we compute the max and subtract it from each logit to avoid overflow,

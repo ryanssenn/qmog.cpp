@@ -64,16 +64,16 @@ void Attention<TLinear>::forward(InferenceState &infer) {
 
     #pragma omp parallel for
     for (size_t h=0; h<infer.config.n_heads; h++){
-        Tensor q_head = infer.q_state.at({h});
-        Tensor k_head = infer.k_cache.at({layer, h/4}).reshape({infer.pos+1, infer.config.head_dim});
-        Tensor score_head = infer.scores.at({h}).reshape({infer.pos+1});
+        auto q_head = infer.q_state.at({h});
+        auto k_head = infer.k_cache.at({layer, h/4}).reshape({infer.pos+1, infer.config.head_dim});
+        auto score_head = infer.scores.at({h}).reshape({infer.pos+1});
 
         matmul(score_head, k_head, q_head);
         mul(score_head, score_head, 1/sqrt(infer.config.head_dim));
         softmax(score_head, score_head);
 
-        Tensor v_head = infer.v_cache.at({layer, h/4}).reshape({infer.pos+1, infer.config.head_dim});
-        Tensor context_head = infer.context.at({h});
+        auto v_head = infer.v_cache.at({layer, h/4}).reshape({infer.pos+1, infer.config.head_dim});
+        auto context_head = infer.context.at({h});
 
         row_matmul(context_head, score_head, v_head);
     }

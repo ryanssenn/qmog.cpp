@@ -110,14 +110,20 @@ int test_kv_cache() {
     infer.push_kv(0);
 
     for (size_t h=0; h<infer.config.n_kv_heads; h++){
-        if (!equals(infer.k_cache.at({0, h, infer.pos}), dummy.at({h}))){
-            std::cout << "KV Cache push k mismatch" << std::endl;
-            return 1;
-        }
+        Tensor<fp16_t> k_cache_head = infer.k_cache.at({0, h, infer.pos});
+        Tensor<fp16_t> v_cache_head = infer.v_cache.at({0, h, infer.pos});
+        Tensor<float> expected_head = dummy.at({h});
 
-        if (!equals(infer.v_cache.at({0, h, infer.pos}), dummy.at({h}))){
-            std::cout << "KV Cache push v mismatch" << std::endl;
-            return 1;
+        for (size_t i = 0; i < expected_head.numel; i++) {
+            if (!equals(k_cache_head.get(i), expected_head.data[i])) {
+                std::cout << "KV Cache push k mismatch" << std::endl;
+                return 1;
+            }
+
+            if (!equals(v_cache_head.get(i), expected_head.data[i])) {
+                std::cout << "KV Cache push v mismatch" << std::endl;
+                return 1;
+            }
         }
     }
 

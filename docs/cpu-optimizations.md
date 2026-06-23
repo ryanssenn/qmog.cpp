@@ -49,3 +49,25 @@ Results:
 | 2026-06-22 | `./perplexity.sh --check` | `Q8F16 PPL: 5.24294`, `tokens: 33`, `delta=+0.0049` vs baseline `5.23808` |
 | 2026-06-22 | `./build/qmog-cli mistral-7B-Q8F16.mog "Paris is the capital of" --temp 0` | `7.88188 tok/s` vs Release control `7.12923 tok/s` |
 
+## F16 KV cache
+
+Implementation:
+
+- Stores `k_cache` and `v_cache` as `Tensor<fp16_t>` instead of `Tensor<float>`.
+- Converts f32 `k_state` and `v_state` values to f16 when pushing into the cache.
+- Promotes cached f16 keys back to float through the existing f16 matmul path for attention scores.
+- Adds an f16 `row_matmul` overload for cached values, promoting V cache entries to float during accumulation.
+
+Benefit:
+
+- Halves KV cache storage from 4 bytes/value to 2 bytes/value.
+- Reduces total K/V cache footprint at `MAX_SEQ_LEN=500` from about 125 MiB to about 62.5 MiB.
+- Targets longer-context attention, where KV cache reads grow linearly with position.
+
+Results:
+
+| Date | Command | Result |
+|------|---------|--------|
+| 2026-06-22 | `cmake --build build && ./build/test_exec` | Passed: `24 / 24` |
+| 2026-06-22 | `./perplexity.sh --check` | `Q8F16 PPL: 5.22389`, `tokens: 33`, `delta=-0.0142` vs baseline `5.23808` |
+| 2026-06-22 | `./build/qmog-cli mistral-7B-Q8F16.mog "Paris is the capital of" --temp 0` | `7.50291 tok/s` vs optimized baseline rerun `7.78253 tok/s` |
