@@ -15,21 +15,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Get HF model revision
-        id: hf-rev
+      - name: Get HF model file id
+        id: hf-file
         run: |
-          sha=$(curl -sf "https://huggingface.co/api/models/${{ env.HF_MOG_REPO }}" \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['sha'])")
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          blob=$(curl -sf "https://huggingface.co/api/models/${{ env.HF_MOG_REPO }}/tree/main" \
+            | python3 -c "import json,sys; files=json.load(sys.stdin); mog=next(f for f in files if f['path']=='${{ env.MODEL_MOG }}'); print(mog['lfs']['oid'])")
+          echo "blob=$blob" >> "$GITHUB_OUTPUT"
 
       - name: Restore model cache
         id: model-cache
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.MODEL_MOG }}
-          key: mog-${{ steps.hf-rev.outputs.sha }}
-          restore-keys: |
-            mog-
+          key: mog-${{ steps.hf-file.outputs.blob }}
 
       - name: Download model
         if: steps.model-cache.outputs.cache-hit != 'true'
@@ -40,7 +38,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ env.MODEL_MOG }}
-          key: mog-${{ steps.hf-rev.outputs.sha }}
+          key: mog-${{ steps.hf-file.outputs.blob }}
 
       - name: Verify model
         run: |
