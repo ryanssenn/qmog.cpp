@@ -51,6 +51,8 @@ bool expect_joined(const QwenPreTokenizer& pt, const std::string& text) {
     return false;
 }
 
+#include "expected/pre_tokenize.inl"
+
 } // namespace
 
 // Empty input should return no pieces when using the Qwen pre-tokenize regex.
@@ -66,16 +68,7 @@ int test_pre_tokenize_empty() {
 int test_pre_tokenize_qwen_splits() {
     const QwenPreTokenizer& pt = qwen_pre_tokenizer();
 
-    const std::vector<std::pair<std::string, std::vector<std::string>>> cases = {
-        {"Hello, world!", {"Hello", ",", " world", "!"}},
-        {"don't", {"don", "'t"}},
-        {"  spaces", {" ", " spaces"}},
-        {"hello\nworld", {"hello", "\n", "world"}},
-        {"café", {"café"}},
-        {"中文", {"中文"}},
-    };
-
-    for (const auto& [text, expected] : cases) {
+    for (const auto& [text, expected] : kSplitCases) {
         if (!expect_pieces(pt, text, expected)) {
             return 1;
         }
@@ -88,17 +81,7 @@ int test_pre_tokenize_qwen_splits() {
 int test_pre_tokenize_qwen_roundtrip() {
     const QwenPreTokenizer& pt = qwen_pre_tokenizer();
 
-    const std::vector<std::string> inputs = {
-        "The quick brown fox",
-        " emojis 😊 and 中文",
-        "café naïve résumé",
-        "\tindent",
-        "line\r\nnext",
-        "!!!???",
-        "hello world",
-    };
-
-    for (const std::string& text : inputs) {
+    for (const std::string& text : kRoundtripInputs) {
         if (!expect_joined(pt, text)) {
             return 1;
         }

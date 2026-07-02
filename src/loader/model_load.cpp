@@ -81,20 +81,14 @@ void ModelLoad::load_config(BinaryReader& reader){
     }
 }
 
-void ModelLoad::load_tensor(std::unordered_map<std::string, Tensor>& m, char* p, const std::string& key, uint8_t dtype, const std::vector<size_t>& shape, uint64_t offset, uint64_t scale_offset, uint32_t scale_size){
+void ModelLoad::load_tensor(std::unordered_map<std::string, Tensor>& m, const std::string& key, uint8_t dtype, const std::vector<size_t>& shape, uint64_t offset){
     DType dt = dtype_from_file(dtype);
     Shape s = Shape::from_dims(shape);
-    if (dt == DType::INT8) {
-        float* scale_start = reinterpret_cast<float*>(p + scale_offset);
-        Tensor t = Tensor::from_ptr(p + offset, dt, std::vector<float>(scale_start, scale_start + scale_size), s);
-        m.insert({key, t});
-    } else {
-        Tensor t = Tensor::from_ptr(p + offset, dt, s);
-        m.insert({key, t});
-    }
+    Tensor t = Tensor::view(storage, offset, dt, s);
+    m.insert({key, t});
 }
 
-void ModelLoad::load_weights(char* p, BinaryReader& reader){
+void ModelLoad::load_weights(size_t payload_base, BinaryReader& reader){
     layer_weights.resize(config.n_layers);
 
     uint32_t count = reader.read_u32();
@@ -115,21 +109,22 @@ void ModelLoad::load_weights(char* p, BinaryReader& reader){
         }
 
         uint64_t offset = reader.read_u64();
-        uint64_t scale_offset = reader.read_u64();
-        uint32_t scale_size = reader.read_u32();
+        // Per-tensor scale fields remain in the format; unused without INT8.
+        reader.read_u64();
+        reader.read_u32();
 
         if (key.compare(0, model_prefix.size(), model_prefix) == 0){
             std::string rest = key.substr(model_prefix.size());
             int layer = std::stoi(rest.substr(0, rest.find(".")));
-            load_tensor(layer_weights[layer], p, rest.substr(rest.find(".") + 1), dtype, shape, offset, scale_offset, scale_size);
+            load_tensor(layer_weights[layer], rest.substr(rest.find(".") + 1), dtype, shape, payload_base + offset);
             continue;
         }
 
-        load_tensor(global_weights, p, key, dtype, shape, offset, scale_offset, scale_size);
+        load_tensor(global_weights, key, dtype, shape, payload_base + offset);
     }
 }
 
-void ModelLoad::load(const std::string& path){
+void ModelLoad::load(const std::string& path, Device device){
     int fd = open(path.c_str(), O_RDONLY);
 
     if (fd < 0){
@@ -179,7 +174,8 @@ void ModelLoad::load(const std::string& path){
         std::exit(1);
     }
 
-    load_weights(base + payload_base, reader);
+    storage = make_storage(device, base, file_size);
+    load_weights(payload_base, reader);
 
     close(fd);
 }

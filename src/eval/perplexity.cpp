@@ -1,6 +1,6 @@
 #include "eval/perplexity.h"
 
-#include "backend/kernels.h"
+#include "backend/metal/kernels.h"
 #include "loader/model_load.h"
 #include "model/inference_state.h"
 #include "model/model.h"

@@ -1,4 +1,5 @@
 #include "setup/context.h"
+#include "backend/metal/metal_backend.h"
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -52,7 +53,15 @@ void print_indented(const std::string& block) {
 
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <model.mog>\n";
+        return 1;
+    }
+
+    init_tests(argv[1]);
+    MetalBackend::init();
+
     const std::string quant = get_model()->config.quant;
 
     size_t name_w = 0;

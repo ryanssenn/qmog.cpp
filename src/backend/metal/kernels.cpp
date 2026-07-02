@@ -1,22 +1,23 @@
-#include "backend/kernels.h"
+#include "backend/metal/kernels.h"
 
-#include "common/dtype.h"
-
-void matmul(Tensor& xout, const Tensor& w, const Tensor& x) {
+void matmul(Tensor& xout, const Tensor& w, const Tensor& x, size_t m) {
     (void)xout;
     (void)w;
     (void)x;
+    (void)m;
 }
 
-void row_matmul(Tensor& xout, const Tensor& x, const Tensor& w) {
+void row_matmul(Tensor& xout, const Tensor& x, const Tensor& w, size_t n) {
     (void)xout;
     (void)x;
     (void)w;
+    (void)n;
 }
 
-void softmax(Tensor& xout, const Tensor& x) {
+void softmax(Tensor& xout, const Tensor& x, size_t n) {
     (void)xout;
     (void)x;
+    (void)n;
 }
 
 void rope(Tensor& xout, const Tensor& x, const Tensor& cos, const Tensor& sin) {

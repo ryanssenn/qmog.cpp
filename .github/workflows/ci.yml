@@ -60,4 +60,4 @@ jobs:
           cmake --build build
 
       - name: Unit tests
-        run: ./build/test_exec
+        run: ./build/test_exec qwen3-0.6B.mog

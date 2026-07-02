@@ -1,8 +1,24 @@
 #include "context.h"
 #include <cmath>
+#include <cstdlib>
 #include <fstream>
+#include <iostream>
 
 std::vector<TestCase> tests;
+
+static std::string g_model_path;
+
+void init_tests(const std::string& path) {
+    if (!std::ifstream(path).good()) {
+        std::cerr << "model file not found: " << path << "\n";
+        std::exit(1);
+    }
+    g_model_path = path;
+}
+
+const std::string& model_path() {
+    return g_model_path;
+}
 
 std::shared_ptr<ModelLoad> get_model(){
     static bool init = false;
@@ -13,12 +29,7 @@ std::shared_ptr<ModelLoad> get_model(){
         return params;
     }
 
-    std::string model_path = "qwen3-0.6B.mog";
-    if (!std::ifstream(model_path).good()) {
-        model_path = "../qwen3-0.6B.mog";
-    }
-
-    params->load(model_path);
+    params->load(g_model_path);
     init = true;
 
     return params;

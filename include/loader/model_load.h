@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <unordered_map>
 #include <string>
-#include "common/dtype.h"
 #include "common/tensor.h"
 #include "tokenizer/qwen_tokenizer.h"
 
@@ -47,23 +46,18 @@ struct ModelLoad {
     Config config;
     QwenTokenizer tokenizer;
 
+    // One storage wrapping the whole mmap'd file; weights are views into it.
+    std::shared_ptr<Storage> storage;
+
     std::unordered_map<std::string, Tensor> global_weights;
     std::vector<std::unordered_map<std::string, Tensor>> layer_weights;
 
     static void* map_file(int fd, size_t& size);
-    void load_tensor(std::unordered_map<std::string, Tensor>& m, char* p, const std::string& key, uint8_t dtype, const std::vector<size_t>& shape, uint64_t offset, uint64_t scale_offset, uint32_t scale_size);
+    void load_tensor(std::unordered_map<std::string, Tensor>& m, const std::string& key, uint8_t dtype, const std::vector<size_t>& shape, uint64_t offset);
 
     void load_config(BinaryReader& reader);
-    void load_weights(char* p, BinaryReader& reader);
-    void load(const std::string& path);
+    void load_weights(size_t payload_base, BinaryReader& reader);
+    void load(const std::string& path, Device device = Device::CPU);
 
     Tensor& get_tensor(int layer, const std::string& name);
 };
-
-inline bool is_f16(const std::string& quant) {
-    return quant == "f16";
-}
-
-inline bool is_q8f16(const std::string& quant) {
-    return quant == "Q8F16" || quant == "q8f16";
-}

@@ -2,9 +2,9 @@
 
 **Experimental project under active development**.
 
-An LLM inference engine optimized for Apple platforms, built entirely with C++ and Metal, with no external dependencies.
+An LLM inference engine optimized for Apple platforms, built in C++/Metal with no external dependencies.
 
-Load a single model file and run inference locally. Models are distributed as `.mog` files, a self-contained format containing model weights, configuration, and tokenizer data. Pre-built models are available, or you can generate your own from a Hugging Face checkpoint using [qpack](https://github.com/ryanssenn/qpack).
+Load a single model file and run inference locally. Models are distributed as `.mog` files, a self-contained format with model weights, configuration, and tokenizer data. Pre-built models are available, or you can generate your own from a Hugging Face checkpoint using [qpack](https://github.com/ryanssenn/qpack).
 
 ## Supported models
 
@@ -67,5 +67,5 @@ Perplexity is the main correctness check. It compares qmog against a Hugging Fac
 Runs all tests under `test/qwen/`.
 
 ```bash
-./build/test_exec
+./build/test_exec qwen3-0.6B.mog
 ```

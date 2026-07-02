@@ -1,34 +1,27 @@
 #pragma once
 
+#include "common/storage.h"
+
 #include <cassert>
 #include <cstddef>
-#include <cstdint>
+#include <memory>
 
-// Bump allocator for activation buffers. Tensor views point into arena memory;
-// the arena (or caller) owns the lifetime.
+// Bump allocator for activation buffers. Owns one Storage; allocate() returns
+// byte offsets into it. Tensors share the storage and view it at an offset.
 struct Arena {
     static constexpr size_t kAlignment = 64;
 
-    size_t BUFFER_SIZE;
-    char* buffer;
+    std::shared_ptr<Storage> storage;
+    size_t capacity;
     size_t offset = 0;
 
-    explicit Arena(size_t buffer_size)
-        : BUFFER_SIZE(buffer_size), buffer(new char[buffer_size]) {}
+    explicit Arena(size_t size, Device device = Device::CPU)
+        : storage(make_storage(device, nullptr, size)), capacity(size) {}
 
-    ~Arena() {
-        delete[] buffer;
-    }
-
-    void* allocate(size_t size) {
+    size_t allocate(size_t size) {
         size_t aligned = (offset + kAlignment - 1) & ~(kAlignment - 1);
-        assert(aligned + size <= BUFFER_SIZE && "Arena out of memory");
-        char* result = buffer + aligned;
+        assert(aligned + size <= capacity && "Arena out of memory");
         offset = aligned + size;
-        return result;
-    }
-
-    void reset() {
-        offset = 0;
+        return aligned;
     }
 };

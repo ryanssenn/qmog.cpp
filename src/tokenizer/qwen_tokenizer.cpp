@@ -1,4 +1,4 @@
-#include "common/utf8.h"
+#include "tokenizer/utf8.h"
 #include "tokenizer/qwen_tokenizer.h"
 
 #include <algorithm>

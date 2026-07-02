@@ -1,5 +1,4 @@
 #include <string>
-#include <iostream>
 #include <vector>
 
 #include "common/dtype.h"
@@ -20,10 +19,12 @@ struct RegisterTest {
     }
 };
 
+void init_tests(const std::string& path);
 std::shared_ptr<ModelLoad> get_model();
+const std::string& model_path();
 
 inline Tensor golden_tensor(const float* data, size_t n) {
-    return Tensor::from_ptr(const_cast<float*>(data), DType::F32, {n});
+    return Tensor::from_ptr(const_cast<float*>(data), DType::F32, Shape::from_dims({n}));
 }
 
 bool equals(const Tensor& x, const Tensor& y, float atol);

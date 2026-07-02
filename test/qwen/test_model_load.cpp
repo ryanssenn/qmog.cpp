@@ -9,14 +9,6 @@
 
 namespace {
 
-std::string resolve_model_path() {
-    std::string model_path = "qwen3-0.6B.mog";
-    if (!std::ifstream(model_path).good()) {
-        model_path = "../qwen3-0.6B.mog";
-    }
-    return model_path;
-}
-
 template<typename T>
 bool expect_eq(const char* field, T got, T want) {
     if (got != want) {
@@ -32,14 +24,6 @@ bool expect_near(const char* field, float got, float want, float atol) {
         return false;
     }
     return true;
-}
-
-size_t shape_product(const std::vector<size_t>& shape) {
-    size_t n = 1;
-    for (size_t d : shape) {
-        n *= d;
-    }
-    return n;
 }
 
 bool check_shape(const std::string& name, const Tensor& t,
@@ -68,76 +52,14 @@ Tensor& resolve_tensor(ModelLoad& params, const std::string& key, int layer) {
     return params.layer_weights[static_cast<size_t>(layer)].at(key);
 }
 
-const std::vector<const char*> kLayerTensorNames = {
-    "input_layernorm.weight",
-    "post_attention_layernorm.weight",
-    "self_attn.q_norm.weight",
-    "self_attn.k_norm.weight",
-    "self_attn.q_proj.weight",
-    "self_attn.k_proj.weight",
-    "self_attn.v_proj.weight",
-    "self_attn.o_proj.weight",
-    "mlp.gate_proj.weight",
-    "mlp.up_proj.weight",
-    "mlp.down_proj.weight",
-};
-
-const std::vector<const char*> kGlobalTensorNames = {
-    "model.embed_tokens.weight",
-    "model.norm.weight",
-};
-
-const std::vector<std::pair<const char*, std::vector<size_t>>> kLayerShapeSpecs = {
-    {"input_layernorm.weight", {1024}},
-    {"post_attention_layernorm.weight", {1024}},
-    {"self_attn.q_norm.weight", {128}},
-    {"self_attn.k_norm.weight", {128}},
-    {"self_attn.q_proj.weight", {2048, 1024}},
-    {"self_attn.k_proj.weight", {1024, 1024}},
-    {"self_attn.v_proj.weight", {1024, 1024}},
-    {"self_attn.o_proj.weight", {1024, 2048}},
-    {"mlp.gate_proj.weight", {3072, 1024}},
-    {"mlp.up_proj.weight", {3072, 1024}},
-    {"mlp.down_proj.weight", {1024, 3072}},
-};
-
-const std::vector<std::pair<const char*, std::vector<size_t>>> kGlobalShapeSpecs = {
-    {"model.embed_tokens.weight", {151936, 1024}},
-    {"model.norm.weight", {1024}},
-};
-
-struct WeightSpotCheck {
-    const char* key;
-    int layer;
-    float first;
-    float last;
-};
-
-const std::vector<WeightSpotCheck> kWeightSpotChecks = {
-    {"model.embed_tokens.weight", -1, -0.00927734375f, 0.00567626953125f},
-    {"model.norm.weight", -1, 3.9375f, 3.640625f},
-    {"input_layernorm.weight", 0, 0.1357421875f, 0.1552734375f},
-    {"post_attention_layernorm.weight", 0, 0.474609375f, 0.5703125f},
-    {"self_attn.q_proj.weight", 0, 0.0034027099609375f, 0.07763671875f},
-    {"self_attn.k_proj.weight", 0, -0.0166015625f, -0.006072998046875f},
-    {"self_attn.v_proj.weight", 0, 0.01214599609375f, -0.0283203125f},
-    {"self_attn.o_proj.weight", 0, 0.01446533203125f, -0.0228271484375f},
-    {"self_attn.q_norm.weight", 0, 4.53125f, 2.390625f},
-    {"self_attn.k_norm.weight", 0, 1.296875f, 2.015625f},
-    {"mlp.gate_proj.weight", 0, -0.0186767578125f, 0.01348876953125f},
-    {"mlp.up_proj.weight", 0, -0.04248046875f, 0.0162353515625f},
-    {"mlp.down_proj.weight", 0, 0.02099609375f, 0.00677490234375f},
-    {"input_layernorm.weight", 27, 17.625f, 13.3125f},
-    {"self_attn.q_proj.weight", 27, -0.034423828125f, 0.01019287109375f},
-    {"mlp.down_proj.weight", 27, -0.01434326171875f, 0.01361083984375f},
-};
+#include "expected/model_load.inl"
 
 } // namespace
 
 // Validates the raw file prefix: MOG magic, format version 2, and a sane header_size
 // that fits within the file. Catches truncated or non-MOG inputs before load.
-int test_mog_header() {
-    const std::string path = resolve_model_path();
+int test_header() {
+    const std::string path = model_path();
     std::ifstream f(path, std::ios::binary);
     if (!f.good()) {
         std::cerr << "model file not found: " << path << "\n";
@@ -190,7 +112,7 @@ int test_mog_header() {
 
 // Checks that ModelLoad parsed the config KV for Qwen3-0.6B: architecture, dims,
 // rope/norm settings, f16 quant, tied embeddings, and special token ids.
-int test_mog_config() {
+int test_config() {
     const Config& c = get_model()->config;
 
     if (c.architecture != "qwen3") {
@@ -224,7 +146,7 @@ int test_mog_config() {
 }
 
 // MOG v2 stores a pre-tokenize regex that must match QwenPreTokenizer's hardcoded pattern.
-int test_mog_tokenizer_metadata() {
+int test_tokenizer_metadata() {
     if (std::string(QwenPreTokenizer::pattern).find("(?i:'s|'t|'re|'ve|'m|'ll|'d)") == std::string::npos) {
         std::cerr << "unexpected Qwen pre_tokenize regex\n";
         return 1;
@@ -235,7 +157,7 @@ int test_mog_tokenizer_metadata() {
 
 // Verifies the tensor table: 28 layers x 11 weights (incl. q_norm/k_norm), two
 // global f16 tensors (embed + norm, no lm_head when tied), and expected shapes/dtypes.
-int test_mog_tensor_inventory() {
+int test_tensor_inventory() {
     const std::shared_ptr<ModelLoad> params = get_model();
 
     if (!expect_eq("global tensor count", params->global_weights.size(), size_t{2})) {
@@ -265,10 +187,6 @@ int test_mog_tensor_inventory() {
                 std::cerr << "  at layer " << layer << "\n";
                 return 1;
             }
-            if (t.numel != shape_product(spec.second)) {
-                std::cerr << spec.first << " numel mismatch at layer " << layer << "\n";
-                return 1;
-            }
             if (t.dtype != DType::F16) {
                 std::cerr << spec.first << " should be f16 at layer " << layer << "\n";
                 return 1;
@@ -286,10 +204,6 @@ int test_mog_tensor_inventory() {
     for (const auto& spec : kGlobalShapeSpecs) {
         const Tensor& t = params->global_weights.at(spec.first);
         if (!check_shape(spec.first, t, spec.second)) {
-            return 1;
-        }
-        if (t.numel != shape_product(spec.second)) {
-            std::cerr << spec.first << " numel mismatch\n";
             return 1;
         }
         if (t.dtype != DType::F16) {
@@ -311,7 +225,7 @@ int test_mog_tensor_inventory() {
 
 // Spot-checks first/last f16 values at known payload offsets on a few tensors
 // (layers 0 and 27). Confirms mmap offsets and f16 decode, not just header layout.
-int test_mog_weight_spotcheck() {
+int test_weight_spotcheck() {
     const std::shared_ptr<ModelLoad> params = get_model();
     constexpr float atol = 1e-3f;
 
@@ -319,8 +233,8 @@ int test_mog_weight_spotcheck() {
         Tensor& t = resolve_tensor(*params, entry.key, entry.layer);
         const size_t n = t.numel;
 
-        const float first_val = t.get(0);
-        const float last_val = t.get(n - 1);
+        const float first_val = static_cast<float>(t.f16()[0]);
+        const float last_val = static_cast<float>(t.f16()[n - 1]);
 
         if (!expect_near("first val", first_val, entry.first, atol)) {
             std::cerr << entry.key;
@@ -339,8 +253,8 @@ int test_mog_weight_spotcheck() {
     return 0;
 }
 
-static RegisterTest mog_header_f16("header", "f16", &test_mog_header);
-static RegisterTest mog_config_f16("config", "f16", &test_mog_config);
-static RegisterTest mog_tokenizer_f16("tokenizer metadata", "f16", &test_mog_tokenizer_metadata);
-static RegisterTest mog_inventory_f16("tensor inventory", "f16", &test_mog_tensor_inventory);
-static RegisterTest mog_spotcheck_f16("weight spotcheck", "f16", &test_mog_weight_spotcheck);
+static RegisterTest header_f16("header", "f16", &test_header);
+static RegisterTest config_f16("config", "f16", &test_config);
+static RegisterTest tokenizer_metadata_f16("tokenizer metadata", "f16", &test_tokenizer_metadata);
+static RegisterTest inventory_f16("tensor inventory", "f16", &test_tensor_inventory);
+static RegisterTest spotcheck_f16("weight spotcheck", "f16", &test_weight_spotcheck);

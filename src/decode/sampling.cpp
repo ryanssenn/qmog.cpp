@@ -6,7 +6,7 @@
 #include <cmath>
 #include <random>
 
-static void softmax(Tensor& xout, const Tensor& x) {
+static void softmax_cpu(Tensor& xout, const Tensor& x) {
     float* xout_data = xout.f32();
     const float* x_data = x.f32();
     float max_val = x_data[0];
@@ -50,7 +50,7 @@ uint32_t sample_multinomial(InferenceState& infer, float temp) {
     for (size_t i = 0; i < infer.logits.numel; i++) {
         probs[i] = logits[i] / temp;
     }
-    softmax(infer.probs, infer.probs);
+    softmax_cpu(infer.probs, infer.probs);
 
     static std::mt19937 gen{std::random_device{}()};
     static std::uniform_real_distribution<double> uniform(0.0, 1.0);

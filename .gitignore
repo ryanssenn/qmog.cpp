@@ -6,6 +6,7 @@ Mistral-7B-v0.1/
 # Build
 build/
 cmake-build-*/
+compile_commands.json
 
 # Python
 venv/
@@ -15,8 +16,10 @@ __pycache__/
 # IDE / OS
 .idea/
 .DS_Store
+.cache/
 
 # Local output
 output.txt
 changes.txt
 scripts/test/output.txt
+scripts/qwen3_reference/

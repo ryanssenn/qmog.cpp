@@ -26,13 +26,5 @@ size_t numel_from_shape(const Shape& shape);
 // Compute row-major strides for shape into strides.
 void init_strides(std::array<size_t, 4>& strides, const Shape& shape);
 
-// Compare shape against an expected dimension list.
-bool shape_equals(const Shape& shape, std::initializer_list<size_t> expected);
-
-// Compare shape against an expected dimension vector.
-bool shape_equals(const Shape& shape, const std::vector<size_t>& expected);
-
-// Compare tensor.shape against an expected dimension list.
-bool shape_equals(const Tensor& tensor, std::initializer_list<size_t> expected);
 // Compare tensor.shape against an expected dimension vector.
 bool shape_equals(const Tensor& tensor, const std::vector<size_t>& expected);

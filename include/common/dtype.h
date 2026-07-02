@@ -5,14 +5,12 @@
 
 enum class DType : uint8_t {
     F32 = 0,
-    INT8 = 1,
     F16 = 2,
 };
 
 inline size_t dtype_size(DType dtype) {
     switch (dtype) {
         case DType::F32: return 4;
-        case DType::INT8: return 1;
         case DType::F16: return 2;
     }
     return 0;

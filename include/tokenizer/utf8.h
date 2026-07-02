@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+// Encode a Unicode code point as a UTF-8 byte string.
 inline std::string utf8_encode(uint32_t cp) {
     std::string out;
 
@@ -25,6 +26,7 @@ inline std::string utf8_encode(uint32_t cp) {
     return out;
 }
 
+// Read the next UTF-8 code point at i, advance i past it, and return false at end of string.
 inline bool utf8_next(const std::string& s, size_t& i, uint32_t& cp) {
     if (i >= s.size()) return false;
 
@@ -65,11 +67,13 @@ inline bool utf8_next(const std::string& s, size_t& i, uint32_t& cp) {
     return true;
 }
 
+// Read the UTF-8 code point at i without advancing i.
 inline bool utf8_peek(const std::string& s, size_t i, uint32_t& cp) {
     size_t j = i;
     return utf8_next(s, j, cp);
 }
 
+// Return the byte index after the UTF-8 code point starting at i.
 inline size_t utf8_advance(const std::string& s, size_t i) {
     uint32_t cp = 0;
     utf8_next(s, i, cp);

@@ -1,12 +1,14 @@
 #include "model/model.h"
 
+#include "backend/metal/kernels.h"
+
 #include <cassert>
-#include <iostream>
+
 
 void Embedding::forward(InferenceState& infer, size_t token_id){
     Tensor row = table.at({token_id});
     for (size_t i = 0; i < embedding_dim; i++) {
-        infer.hidden_state.f32()[i] = row.get(i);
+        infer.hidden_state.f32()[i] = static_cast<float>(row.f16()[i]);
     }
 }
 
@@ -34,7 +36,7 @@ void RMSNorm::forward(Tensor& x) {
 
         const float scale = 1.0f / sqrt(squares / cols + e);
         for (size_t i = 0; i < cols; i++) {
-            slice[i] *= scale * g.get(i);
+            slice[i] *= scale * static_cast<float>(g.f16()[i]);
         }
     }
 }
@@ -56,17 +58,17 @@ void Attention::forward(InferenceState &infer) {
 
     for (size_t h=0; h<infer.config.n_heads; h++){
         auto q_head = infer.q_state.at({h});
-        auto k_head = infer.k_cache.at({layer, h/4}).view_rows(infer.pos + 1);
-        auto score_head = infer.scores.at({h}).view_prefix(infer.pos + 1);
+        auto k_head = infer.k_cache.at({layer, h/4});
+        auto score_head = infer.scores.at({h});
 
-        matmul(score_head, k_head, q_head);
+        matmul(score_head, k_head, q_head, infer.pos + 1);
         mul(score_head, score_head, 1/sqrt(infer.config.head_dim));
-        softmax(score_head, score_head);
+        softmax(score_head, score_head, infer.pos + 1);
 
-        auto v_head = infer.v_cache.at({layer, h/4}).view_rows(infer.pos + 1);
+        auto v_head = infer.v_cache.at({layer, h/4});
         auto context_head = infer.context.at({h});
 
-        row_matmul(context_head, score_head, v_head);
+        row_matmul(context_head, score_head, v_head, infer.pos + 1);
     }
 
     matmul(infer.hidden_state, o_proj, infer.context);

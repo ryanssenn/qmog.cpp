@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 
+#include "backend/metal/metal_backend.h"
 #include "loader/model_load.h"
 #include "model/inference_state.h"
 #include "model/model.h"
@@ -9,6 +10,8 @@
 #include "eval/perplexity.h"
 
 int main(int argc, char** argv) {
+    MetalBackend::init();
+
     float temp = 0.0f;
     bool ppl = false;
     std::vector<std::string> positional;

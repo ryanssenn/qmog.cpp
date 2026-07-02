@@ -1,4 +1,3 @@
-#include "backend/kernels.h"
 #include "loader/model_load.h"
 #include "model/inference_state.h"
 
@@ -6,9 +5,8 @@
 // https://docs.pytorch.org/docs/stable/generated/torch.nn.Embedding.html
 struct Embedding {
     Tensor table;
-    size_t num_embeddings;
     size_t embedding_dim;
-    Embedding(const Tensor& table) : table(table), num_embeddings(table.shape[0]), embedding_dim(table.shape[1]) {}
+    Embedding(const Tensor& table) : table(table), embedding_dim(table.shape[1]) {}
     void forward(InferenceState& infer, size_t token_id);
 };
 
@@ -20,9 +18,9 @@ struct RotaryEmbedding {
 // https://github.com/huggingface/transformers/blob/main/src/transformers/models/mistral/modeling_mistral.py#L58
 struct RMSNorm {
     Tensor g;
-    float e = 1e-5f;
+    float e;
 
-    RMSNorm(const Tensor& g) : g(g) {}
+    RMSNorm(const Tensor& g, float e) : g(g), e(e) {}
     void forward(Tensor& x);
 };
 
@@ -43,13 +41,14 @@ struct Attention {
               const Tensor& o_proj,
               const Tensor& q_norm_weight,
               const Tensor& k_norm_weight,
+              float norm_eps,
               size_t layer)
             : q_proj(q_proj),
               k_proj(k_proj),
               v_proj(v_proj),
               o_proj(o_proj),
-              q_norm(q_norm_weight),
-              k_norm(k_norm_weight),
+              q_norm(q_norm_weight, norm_eps),
+              k_norm(k_norm_weight, norm_eps),
               layer(layer){}
 
     void forward(InferenceState& infer);
@@ -80,8 +79,8 @@ struct Layer {
     Layer(int i, std::shared_ptr<ModelLoad> p) :
                                 i(i),
 
-                                input_norm(p->get_tensor(i, "input_layernorm.weight")),
-                                output_norm(p->get_tensor(i, "post_attention_layernorm.weight")),
+                                input_norm(p->get_tensor(i, "input_layernorm.weight"), p->config.norm_eps),
+                                output_norm(p->get_tensor(i, "post_attention_layernorm.weight"), p->config.norm_eps),
 
                                 attn(p->get_tensor(i, "self_attn.q_proj.weight"),
                                      p->get_tensor(i, "self_attn.k_proj.weight"),
@@ -89,6 +88,7 @@ struct Layer {
                                      p->get_tensor(i, "self_attn.o_proj.weight"),
                                      p->get_tensor(i, "self_attn.q_norm.weight"),
                                      p->get_tensor(i, "self_attn.k_norm.weight"),
+                                     p->config.norm_eps,
                                      i),
 
                                 mlp(p->get_tensor(i, "mlp.down_proj.weight"),
@@ -123,7 +123,7 @@ struct Model {
 
     Model(std::shared_ptr<ModelLoad> params)
         : embedding(params->get_tensor(-1, "model.embed_tokens.weight")),
-          norm(params->get_tensor(-1, "model.norm.weight")),
+          norm(params->get_tensor(-1, "model.norm.weight"), params->config.norm_eps),
           lmHead(params) {
         for (int i=0;i<params->config.n_layers; i++){
             layers.emplace_back(i, params);

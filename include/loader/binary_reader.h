@@ -20,8 +20,6 @@ class BinaryReader {
 public:
     BinaryReader(const char* data, size_t size) : data_(data), size_(size) {}
 
-    size_t position() const { return pos_; }
-
     uint8_t read_u8() {
         require(1);
         return static_cast<uint8_t>(data_[pos_++]);

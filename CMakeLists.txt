@@ -1,11 +1,17 @@
 cmake_minimum_required(VERSION 3.20)
-project(qmog.cpp CXX)
+project(qmog.cpp LANGUAGES CXX OBJCXX)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_OBJCXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
+find_library(METAL_FRAMEWORK Metal REQUIRED)
 
 set(QMOG_COMMON_SRC
     src/common/shape.cpp
+    src/common/storage.cpp
     src/common/tensor.cpp
 )
 
@@ -25,8 +31,10 @@ set(QMOG_MODEL_SRC
 )
 
 set(QMOG_BACKEND_SRC
-    src/backend/cpu/kernels.cpp
+    src/backend/metal/kernels.cpp
+    src/backend/metal/metal_backend.mm
 )
+set_source_files_properties(src/backend/metal/metal_backend.mm PROPERTIES COMPILE_FLAGS "-fobjc-arc")
 
 set(QMOG_DECODE_SRC
     src/decode/sampling.cpp
@@ -41,6 +49,7 @@ set(TEST_QWEN_SRC
     test/qwen/setup/context.cpp
     test/qwen/test_model_load.cpp
     test/qwen/test_pre_tokenize.cpp
+    test/qwen/test_tensor.cpp
     test/qwen/test_tokenizer.cpp
 )
 
@@ -69,3 +78,6 @@ target_include_directories(test_exec PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/test/qwen
 )
+
+target_link_libraries(qmog-cli PRIVATE ${METAL_FRAMEWORK} ${FOUNDATION_FRAMEWORK})
+target_link_libraries(test_exec PRIVATE ${METAL_FRAMEWORK} ${FOUNDATION_FRAMEWORK})

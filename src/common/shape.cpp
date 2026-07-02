@@ -48,47 +48,6 @@ void init_strides(std::array<size_t, 4>& strides, const Shape& shape) {
     }
 }
 
-// Compare shape against an expected dimension list.
-bool shape_equals(const Shape& shape, std::initializer_list<size_t> expected) {
-    if (shape.ndim != expected.size()) {
-        return false;
-    }
-    size_t i = 0;
-    for (size_t d : expected) {
-        if (shape.dims[i++] != d) {
-            return false;
-        }
-    }
-    return true;
-}
-
-// Compare shape against an expected dimension vector.
-bool shape_equals(const Shape& shape, const std::vector<size_t>& expected) {
-    if (shape.ndim != expected.size()) {
-        return false;
-    }
-    for (uint8_t i = 0; i < shape.ndim; i++) {
-        if (shape.dims[i] != expected[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-// Compare tensor.shape against an expected dimension list.
-bool shape_equals(const Tensor& tensor, std::initializer_list<size_t> expected) {
-    if (tensor.ndim != expected.size()) {
-        return false;
-    }
-    size_t i = 0;
-    for (size_t d : expected) {
-        if (tensor.shape[i++] != d) {
-            return false;
-        }
-    }
-    return true;
-}
-
 // Compare tensor.shape against an expected dimension vector.
 bool shape_equals(const Tensor& tensor, const std::vector<size_t>& expected) {
     if (tensor.ndim != expected.size()) {
